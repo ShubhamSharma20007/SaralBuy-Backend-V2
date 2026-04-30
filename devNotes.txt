@@ -1,0 +1,2 @@
+BuyerId === Who created product
+SellerId === Who is placing bid
