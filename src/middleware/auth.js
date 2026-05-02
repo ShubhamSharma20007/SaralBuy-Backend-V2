@@ -2,8 +2,7 @@ import jwt from 'jsonwebtoken';
 import { ApiResponse } from '../helpers/ApiReponse.js';
 
 const auth = (req, res, next) => {
-
-  const token =req.cookies?.authToken;
+  const token = req.cookies?.authToken;
 
   if (!token) return ApiResponse.errorResponse(res, 401, 'Token not found');
 
@@ -12,7 +11,7 @@ const auth = (req, res, next) => {
     // console.log('auth middleware decoded:', decoded);
     req.user = {
       ...decoded,
-      userId: decoded.userId || decoded._id
+      userId: decoded.userId || decoded._id,
     };
     console.log('auth middleware req.user:', req.user);
     next();

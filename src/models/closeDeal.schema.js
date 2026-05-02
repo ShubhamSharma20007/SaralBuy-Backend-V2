@@ -1,39 +1,39 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const closedDealSchema = new mongoose.Schema(
   {
     productId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
+      ref: 'Product',
       required: true,
     },
     buyerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     sellerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     yourBudget: { type: Number, required: true },
     date: { type: Date, default: Date.now }, // Date of deal closure
     finalBudget: { type: Number },
     closedAt: { type: Date, default: Date.now },
-    initiator: { type: String, default: "buyer" },
+    initiator: { type: String, default: 'buyer' },
     closedDealStatus: {
       type: String,
-      enum: ["pending", "waiting_seller_approval", "completed", "rejected"],
-      default: "pending",
+      enum: ['pending', 'waiting_seller_approval', 'completed', 'rejected'],
+      default: 'pending',
     },
     dealStatus: {
       type: String,
-      enum: ["pending", "accepted", "rejected"],
-      default: "pending",
+      enum: ['pending', 'accepted', 'rejected'],
+      default: 'pending',
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
-export default mongoose.model("ClosedDeal", closedDealSchema);
+export default mongoose.model('ClosedDeal', closedDealSchema);

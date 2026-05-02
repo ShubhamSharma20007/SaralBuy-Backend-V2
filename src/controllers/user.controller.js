@@ -1,7 +1,7 @@
-import bcrypt from "bcryptjs";
-import { ApiResponse } from "../helpers/ApiReponse.js";
-import userSchema from "../models/user.schema.js";
-import uploadFile from "../config/imageKit.config.js";
+import bcrypt from 'bcryptjs';
+import { ApiResponse } from '../helpers/ApiReponse.js';
+import userSchema from '../models/user.schema.js';
+import uploadFile from '../config/imageKit.config.js';
 
 // const otpStore = new Map();
 
@@ -90,53 +90,45 @@ export const sendOtp = async (req, res) => {
   let { pNo } = req.body;
   try {
     const apiKey = process.env.FACTOR_MESSAGE_API;
-    pNo = pNo.startsWith("+") ? pNo.slice(1) : `91${pNo}`;
-    console.log("Phone Number:", pNo);
+    pNo = pNo.startsWith('+') ? pNo.slice(1) : `91${pNo}`;
+    console.log('Phone Number:', pNo);
 
     // Check for inactive users
     const findUser = await userSchema.findOne({
-      phone: new RegExp(`^\\+${pNo}$`, "i"),
-      status: "inactive",
-      role: "user",
+      phone: new RegExp(`^\\+${pNo}$`, 'i'),
+      status: 'inactive',
+      role: 'user',
     });
 
     if (findUser) {
       return ApiResponse.errorResponse(
         res,
         400,
-        "Your account is not active. Please contact to admin",
+        'Your account is not active. Please contact to admin'
       );
     }
     const apiUrl = `https://2factor.in/API/V1/${apiKey}/SMS/+${pNo}/AUTOGEN/SalarBuy`;
 
-    console.log("Sending OTP to:", pNo);
-    console.log("API URL:", apiUrl);
+    console.log('Sending OTP to:', pNo);
+    console.log('API URL:', apiUrl);
 
     const response = await fetch(apiUrl);
     const data = await response.json();
-    console.log("OTP response:", data);
+    console.log('OTP response:', data);
 
-    if (data.Status !== "Success") {
-      return ApiResponse.errorResponse(
-        res,
-        400,
-        data.Details || "OTP sending failed",
-      );
+    if (data.Status !== 'Success') {
+      return ApiResponse.errorResponse(res, 400, data.Details || 'OTP sending failed');
     }
 
-    console.log("✅ OTP SENT SUCCESSFULLY via SMS");
+    console.log('✅ OTP SENT SUCCESSFULLY via SMS');
 
     // Store the session ID to verify OTP later
-    return ApiResponse.successResponse(res, 200, "OTP sent successfully", {
+    return ApiResponse.successResponse(res, 200, 'OTP sent successfully', {
       sessionId: data.Details, // This is the session ID you'll need for verification
     });
   } catch (err) {
-    console.error("OTP sending error:", err);
-    return ApiResponse.errorResponse(
-      res,
-      500,
-      err?.message || "Internal server error",
-    );
+    console.error('OTP sending error:', err);
+    return ApiResponse.errorResponse(res, 500, err?.message || 'Internal server error');
   }
 };
 
@@ -145,31 +137,23 @@ export const verifyOtp = async (req, res) => {
 
   try {
     if (!pNo || !otp || !sessionId) {
-      return ApiResponse.errorResponse(
-        res,
-        400,
-        "Phone number, OTP, and sessionId are required",
-      );
+      return ApiResponse.errorResponse(res, 400, 'Phone number, OTP, and sessionId are required');
     }
 
     const apiKey = process.env.FACTOR_MESSAGE_API;
 
-    pNo = pNo.startsWith("+") ? pNo.slice(1) : `91${pNo}`;
+    pNo = pNo.startsWith('+') ? pNo.slice(1) : `91${pNo}`;
 
     const apiUrl = `https://2factor.in/API/V1/${apiKey}/SMS/VERIFY/${sessionId}/${otp}`;
 
     const response = await fetch(apiUrl, {
-      method: "GET",
+      method: 'GET',
     });
 
     const data = await response.json();
 
-    if (data.Status !== "Success") {
-      return ApiResponse.errorResponse(
-        res,
-        400,
-        data.Details || "OTP verification failed",
-      );
+    if (data.Status !== 'Success') {
+      return ApiResponse.errorResponse(res, 400, data.Details || 'OTP verification failed');
     }
 
     let user = await userSchema.findOne({ phone: `+${pNo}` });
@@ -181,32 +165,28 @@ export const verifyOtp = async (req, res) => {
     const token = user.generateAuthToken();
     user.lastLogin = new Date();
     await user.save();
-    res.cookie("authToken", token, {
-      sameSite: "none",
+    res.cookie('authToken', token, {
+      sameSite: 'none',
       httpOnly: true,
       secure: true,
-      path: "/",
+      path: '/',
     });
 
-    return ApiResponse.successResponse(res, 200, "OTP verified successfully", {
+    return ApiResponse.successResponse(res, 200, 'OTP verified successfully', {
       token,
       user: { _id: user._id, phone: user.phone },
     });
   } catch (err) {
-    console.error("OTP verify error:", err);
-    return ApiResponse.errorResponse(
-      res,
-      500,
-      err?.message || "Internal server error",
-    );
+    console.error('OTP verify error:', err);
+    return ApiResponse.errorResponse(res, 500, err?.message || 'Internal server error');
   }
 };
 
 // Get user profile
 export const getProfile = async (req, res) => {
   try {
-    const user = await userSchema.findById(req.user._id).select("-password");
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await userSchema.findById(req.user._id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
     res.status(200).json(user);
   } catch (err) {
     console.log(err);
@@ -241,8 +221,7 @@ export const updateProfile = async (req, res) => {
         email,
         _id: { $ne: req.user.userId },
       });
-      if (existingEmail)
-        return res.status(409).json({ message: "Email already in use" });
+      if (existingEmail) return res.status(409).json({ message: 'Email already in use' });
     }
 
     if (phone) {
@@ -250,8 +229,7 @@ export const updateProfile = async (req, res) => {
         phone,
         _id: { $ne: req.user.userId },
       });
-      if (existingPhone)
-        return res.status(409).json({ message: "Phone already in use" });
+      if (existingPhone) return res.status(409).json({ message: 'Phone already in use' });
     }
 
     const updates = {};
@@ -259,7 +237,7 @@ export const updateProfile = async (req, res) => {
     if (firstName) updates.firstName = firstName;
     if (lastName) updates.lastName = lastName;
     if (email) updates.email = email;
-    if (phone) updates.phone = phone.startsWith("+") ? phone : `+91${phone}`;
+    if (phone) updates.phone = phone.startsWith('+') ? phone : `+91${phone}`;
     if (documentUrl) updates.aadhaarImage = documentUrl;
     if (address) updates.address = address;
     if (aadhaarNumber) updates.aadhaarNumber = aadhaarNumber;
@@ -269,14 +247,9 @@ export const updateProfile = async (req, res) => {
 
     const user = await userSchema
       .findByIdAndUpdate(req.user.userId, updates, { new: true })
-      .select("-password");
+      .select('-password');
 
-    return ApiResponse.successResponse(
-      res,
-      200,
-      "user updated successfully",
-      user,
-    );
+    return ApiResponse.successResponse(res, 200, 'user updated successfully', user);
   } catch (err) {
     return ApiResponse.errorResponse(res, 500, err.message, null);
   }

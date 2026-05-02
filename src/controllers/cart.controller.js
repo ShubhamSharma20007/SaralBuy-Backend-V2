@@ -1,7 +1,7 @@
-import { isValidObjectId } from "mongoose";
-import productSchema from "../models/product.schema.js";
-import { ApiResponse } from "../helpers/ApiReponse.js";
-import cartSchema from "../models/cart.schema.js";
+import { isValidObjectId } from 'mongoose';
+import productSchema from '../models/product.schema.js';
+import { ApiResponse } from '../helpers/ApiReponse.js';
+import cartSchema from '../models/cart.schema.js';
 
 export const addToCart = async (req, res) => {
   try {
@@ -9,20 +9,16 @@ export const addToCart = async (req, res) => {
     const { productId } = req.body;
 
     if (!userId || !isValidObjectId(userId)) {
-      return ApiResponse.errorResponse(res, 400, "Invalid or missing userId");
+      return ApiResponse.errorResponse(res, 400, 'Invalid or missing userId');
     }
 
     if (!productId || !isValidObjectId(productId)) {
-      return ApiResponse.errorResponse(
-        res,
-        400,
-        "Invalid or missing productId",
-      );
+      return ApiResponse.errorResponse(res, 400, 'Invalid or missing productId');
     }
 
     const product = await productSchema.findById(productId);
     if (!product) {
-      return ApiResponse.errorResponse(res, 404, "Product not found");
+      return ApiResponse.errorResponse(res, 404, 'Product not found');
     }
 
     let cart = await cartSchema.findOne({ userId });
@@ -30,17 +26,10 @@ export const addToCart = async (req, res) => {
       cart = new cartSchema({ userId, cartItems: [] });
     }
 
-    const alreadyExists = cart.cartItems.find((item) =>
-      item.productIds.includes(productId),
-    );
+    const alreadyExists = cart.cartItems.find(item => item.productIds.includes(productId));
 
     if (alreadyExists) {
-      return ApiResponse.successResponse(
-        res,
-        200,
-        "Product already in your cart",
-        cart,
-      );
+      return ApiResponse.successResponse(res, 200, 'Product already in your cart', cart);
     }
 
     cart.cartItems.push({
@@ -50,14 +39,10 @@ export const addToCart = async (req, res) => {
 
     await cart.save();
 
-    return ApiResponse.successResponse(res, 201, "Product added to cart", cart);
+    return ApiResponse.successResponse(res, 201, 'Product added to cart', cart);
   } catch (err) {
     console.error(err);
-    return ApiResponse.errorResponse(
-      res,
-      500,
-      err.message || "Failed to add to cart",
-    );
+    return ApiResponse.errorResponse(res, 500, err.message || 'Failed to add to cart');
   }
 };
 
@@ -66,13 +51,13 @@ export const getUserCart = async (req, res) => {
     const userId = req.user?.userId;
 
     if (!userId) {
-      return ApiResponse.errorResponse(res, 400, "User not authenticated");
+      return ApiResponse.errorResponse(res, 400, 'User not authenticated');
     }
 
     const cart = await cartSchema.findOne({ userId }).lean();
 
     if (!cart || !cart.cartItems.length) {
-      return ApiResponse.successResponse(res, 200, "Cart is empty", []);
+      return ApiResponse.successResponse(res, 200, 'Cart is empty', []);
     }
 
     // const cleanProduct = (prod) => {
@@ -83,7 +68,7 @@ export const getUserCart = async (req, res) => {
     //   delete p.__v;
     //   return p;
     // };
-    const cleanProduct = (prod) => {
+    const cleanProduct = prod => {
       if (!prod) return prod;
 
       const p = { ...prod };
@@ -110,15 +95,15 @@ export const getUserCart = async (req, res) => {
 
     const enhancedCartItems = (
       await Promise.all(
-        cart.cartItems.map(async (item) => {
+        cart.cartItems.map(async item => {
           const productId = item.productIds[0]; // always single now
 
           const product = await productSchema
             .findById(productId)
-            .populate({ path: "categoryId", select: "-subCategories" })
+            .populate({ path: 'categoryId', select: '-subCategories' })
             .populate({
-              path: "userId",
-              select: "firstName lastName address",
+              path: 'userId',
+              select: 'firstName lastName address',
             })
             .lean();
 
@@ -127,7 +112,7 @@ export const getUserCart = async (req, res) => {
             cartItemId: item._id,
             addedAt: item.addedAt,
           };
-        }),
+        })
       )
     ).sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
 
@@ -139,19 +124,10 @@ export const getUserCart = async (req, res) => {
       updatedAt: cart.updatedAt,
     };
 
-    return ApiResponse.successResponse(
-      res,
-      200,
-      "Cart fetched successfully",
-      cartResponse,
-    );
+    return ApiResponse.successResponse(res, 200, 'Cart fetched successfully', cartResponse);
   } catch (err) {
     console.error(err);
-    return ApiResponse.errorResponse(
-      res,
-      500,
-      err.message || "Failed to fetch cart",
-    );
+    return ApiResponse.errorResponse(res, 500, err.message || 'Failed to fetch cart');
   }
 };
 
@@ -161,26 +137,18 @@ export const removeCart = async (req, res) => {
 
     const cart = await cartSchema.findById(cartId);
     if (!cart) {
-      return ApiResponse.errorResponse(res, 404, "Cart not found");
+      return ApiResponse.errorResponse(res, 404, 'Cart not found');
     }
 
     cart.cartItems = cart.cartItems.filter(
-      (item) => item.productIds[0].toString() !== productId.toString(),
+      item => item.productIds[0].toString() !== productId.toString()
     );
 
     await cart.save();
 
-    return ApiResponse.successResponse(
-      res,
-      200,
-      "Cart item removed successfully",
-    );
+    return ApiResponse.successResponse(res, 200, 'Cart item removed successfully');
   } catch (err) {
     console.error(err);
-    return ApiResponse.errorResponse(
-      res,
-      500,
-      err.message || "Failed to remove cart item",
-    );
+    return ApiResponse.errorResponse(res, 500, err.message || 'Failed to remove cart item');
   }
 };

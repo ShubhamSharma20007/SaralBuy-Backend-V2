@@ -1,20 +1,20 @@
-import multer from "multer";
-import path from "path";
-import fs from "fs";
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  const allowedExt = [".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx",".csv"];
+  const allowedExt = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx', '.csv'];
   const ext = path.extname(file.originalname).toLowerCase();
   if (ext) {
     cb(null, true);
   } else {
-     cb(new Error("Invalid file type"), false);
+    cb(new Error('Invalid file type'), false);
   }
 };
 
- const upload = multer({
+const upload = multer({
   storage: storage,
   fileFilter,
   limits: {
@@ -22,12 +22,9 @@ const fileFilter = (req, file, cb) => {
   },
 });
 
-
-export const allowUploadFields =()=>{
-  return (
-    upload.fields([
-      { name: "image", maxCount: 1 },
-      { name: "document", maxCount: 5 },
-    ])
-  )
-}
+export const allowUploadFields = () => {
+  return upload.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'document', maxCount: 5 },
+  ]);
+};

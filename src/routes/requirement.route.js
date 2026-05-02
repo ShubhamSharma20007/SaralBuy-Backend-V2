@@ -1,7 +1,7 @@
-import express from "express"
-import { getRecentRequirements } from "../controllers/requirement.controller.js"
-const router = express.Router()
+import express from 'express';
+import { getRecentRequirements } from '../controllers/requirement.controller.js';
+const router = express.Router();
 
-router.get('/recent-requirements', getRecentRequirements)
+router.get('/recent-requirements', getRecentRequirements);
 
-export default router
+export default router;

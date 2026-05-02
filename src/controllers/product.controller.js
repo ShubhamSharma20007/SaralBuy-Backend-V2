@@ -1,17 +1,17 @@
-import { isValidObjectId } from "mongoose";
-import mongoose from "mongoose";
-import uploadFile from "../config/imageKit.config.js";
-import { ApiResponse } from "../helpers/ApiReponse.js";
-import productSchema from "../models/product.schema.js";
-import closeDealSchema from "../models/closeDeal.schema.js";
+import { isValidObjectId } from 'mongoose';
+import mongoose from 'mongoose';
+import uploadFile from '../config/imageKit.config.js';
+import { ApiResponse } from '../helpers/ApiReponse.js';
+import productSchema from '../models/product.schema.js';
+import closeDealSchema from '../models/closeDeal.schema.js';
 
 export const addProduct = async (req, res) => {
   try {
     const image = req.files?.image?.[0];
     const document = req.files?.document?.[0];
     const body = { ...req.body };
-    ["paymentAndDelivery", "oldProductValue"].forEach((key) => {
-      if (typeof body[key] === "string") {
+    ['paymentAndDelivery', 'oldProductValue'].forEach(key => {
+      if (typeof body[key] === 'string') {
         try {
           body[key] = JSON.parse(body[key]);
         } catch {}
@@ -30,15 +30,13 @@ export const addProduct = async (req, res) => {
       title: body.title,
       description: body.description,
       quantity: body.quantity,
-      minimumBudget: body.minimumBudget
-        ? Number(body.minimumBudget)
-        : undefined,
+      minimumBudget: body.minimumBudget ? Number(body.minimumBudget) : undefined,
       brand: body.brand,
       brandName: body.brandName,
       categoryId: body.categoryId,
       subCategoryId: body.subCategoryId,
       userId: req.user._id,
-      draft: body.draft === "true" || body.draft === true,
+      draft: body.draft === 'true' || body.draft === true,
       image: imageUrl,
       document: documentUrl,
       productType: body.productType,
@@ -57,12 +55,7 @@ export const addProduct = async (req, res) => {
       paymentAndDelivery: body.paymentAndDelivery,
     });
 
-    return ApiResponse.successResponse(
-      res,
-      201,
-      "Product created successfully",
-      product,
-    );
+    return ApiResponse.successResponse(res, 201, 'Product created successfully', product);
   } catch (error) {
     console.log(error);
     return ApiResponse.errorResponse(res, 401, error.message || error, null);
@@ -80,9 +73,9 @@ export const getTrendingCategory = async (req, res) => {
       { $sort: { createdAt: -1 } },
       {
         $group: {
-          _id: "$categoryId",
+          _id: '$categoryId',
           count: { $sum: 1 },
-          product: { $first: "$$ROOT" },
+          product: { $first: '$$ROOT' },
         },
       },
       {
@@ -95,39 +88,34 @@ export const getTrendingCategory = async (req, res) => {
       },
       {
         $lookup: {
-          from: "categories",
-          localField: "_id",
-          foreignField: "_id",
-          as: "category",
+          from: 'categories',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'category',
         },
       },
       {
-        $unwind: "$category",
+        $unwind: '$category',
       },
 
       {
         $project: {
           _id: 0,
           category: {
-            _id: "$category._id",
-            categoryName: "$category.categoryName",
-            image: "$category.image",
+            _id: '$category._id',
+            categoryName: '$category.categoryName',
+            image: '$category.image',
           },
-          productId: "$product._id",
+          productId: '$product._id',
         },
       },
     ]);
-    return ApiResponse.successResponse(
-      res,
-      200,
-      "Trending categories",
-      trendingProducts,
-    );
+    return ApiResponse.successResponse(res, 200, 'Trending categories', trendingProducts);
   } catch (error) {
     return ApiResponse.errorResponse(
       res,
       400,
-      error.message || "Failed to get trending categories",
+      error.message || 'Failed to get trending categories'
     );
   }
 };
@@ -138,7 +126,7 @@ export const getHomeProducts = async (req, res) => {
       { $match: { draft: false } },
       {
         $group: {
-          _id: "$categoryId",
+          _id: '$categoryId',
           count: { $sum: 1 },
         },
       },
@@ -146,7 +134,7 @@ export const getHomeProducts = async (req, res) => {
       { $limit: 2 },
     ]);
 
-    const topCategoryIds = topCategories.map((c) => c._id);
+    const topCategoryIds = topCategories.map(c => c._id);
     const topProductsPerCategory = await productSchema.aggregate([
       {
         $match: {
@@ -157,37 +145,37 @@ export const getHomeProducts = async (req, res) => {
       // Populate category info
       {
         $lookup: {
-          from: "categories",
-          localField: "categoryId",
-          foreignField: "_id",
-          as: "categoryInfo",
+          from: 'categories',
+          localField: 'categoryId',
+          foreignField: '_id',
+          as: 'categoryInfo',
         },
       },
-      { $unwind: "$categoryInfo" },
+      { $unwind: '$categoryInfo' },
 
       // Populate user info
       {
         $lookup: {
-          from: "users",
-          localField: "userId",
-          foreignField: "_id",
-          as: "userInfo",
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'userInfo',
         },
       },
-      { $unwind: "$userInfo" },
+      { $unwind: '$userInfo' },
 
       {
         $group: {
-          _id: "$categoryId",
-          categoryName: { $first: "$categoryInfo.categoryName" },
-          products: { $push: "$$ROOT" },
+          _id: '$categoryId',
+          categoryName: { $first: '$categoryInfo.categoryName' },
+          products: { $push: '$$ROOT' },
         },
       },
       {
         $project: {
           _id: 1,
           categoryName: 1,
-          products: { $slice: ["$products", 3] },
+          products: { $slice: ['$products', 3] },
         },
       },
     ]);
@@ -195,47 +183,42 @@ export const getHomeProducts = async (req, res) => {
     return ApiResponse.successResponse(
       res,
       200,
-      "Products fetched successfully",
-      topProductsPerCategory,
+      'Products fetched successfully',
+      topProductsPerCategory
     );
   } catch (error) {
     console.error(error);
-    return ApiResponse.errorResponse(
-      res,
-      500,
-      error.message || "Failed to fetch products",
-    );
+    return ApiResponse.errorResponse(res, 500, error.message || 'Failed to fetch products');
   }
 };
 
 export const getProductByName = async (req, res) => {
   try {
     const { productName } = req.params;
-    if (!productName)
-      return ApiResponse.successResponse(res, 200, "empty query", []);
+    if (!productName) return ApiResponse.successResponse(res, 200, 'empty query', []);
     const products = await productSchema
       .find(
         {
-          title: { $regex: productName, $options: "i" },
+          title: { $regex: productName, $options: 'i' },
           draft: false,
         },
         {
           title: 1,
           image: 1,
           description: 1,
-        },
+        }
       )
       .populate({
-        path: "userId",
-        select: "firstName lastName address",
+        path: 'userId',
+        select: 'firstName lastName address',
       })
       .populate({
-        path: "categoryId",
-        select: "categoryName",
+        path: 'categoryId',
+        select: 'categoryName',
       })
       .limit(5)
       .lean();
-    return ApiResponse.successResponse(res, 200, "products found", products);
+    return ApiResponse.successResponse(res, 200, 'products found', products);
   } catch (error) {
     console.error(error);
     return ApiResponse.errorResponse(res, 400, error.message, null);
@@ -269,14 +252,14 @@ export const searchProductsController = async (req, res) => {
     const subCatId = req.query.subCategoryId;
     if (catId) {
       if (!isValidObjectId(catId)) {
-        return ApiResponse.errorResponse(res, 400, "Invalid categoryId");
+        return ApiResponse.errorResponse(res, 400, 'Invalid categoryId');
       }
       filter.categoryId = new mongoose.Types.ObjectId(catId);
       useTitleSearch = false;
     }
     if (subCatId) {
       if (!isValidObjectId(subCatId)) {
-        return ApiResponse.errorResponse(res, 400, "Invalid subCategoryId");
+        return ApiResponse.errorResponse(res, 400, 'Invalid subCategoryId');
       }
       filter.subCategoryId = new mongoose.Types.ObjectId(subCatId);
       useTitleSearch = false;
@@ -284,11 +267,11 @@ export const searchProductsController = async (req, res) => {
 
     // If not searching by category, require title
     if (useTitleSearch) {
-      if (!title || typeof title !== "string" || title.trim().length < 2) {
+      if (!title || typeof title !== 'string' || title.trim().length < 2) {
         return ApiResponse.errorResponse(
           res,
           400,
-          "Valid product title is required (min 2 characters)",
+          'Valid product title is required (min 2 characters)'
         );
       }
       const words = title.trim().split(/\s+/);
@@ -296,16 +279,16 @@ export const searchProductsController = async (req, res) => {
       // Strong filter: all words as whole words
       const strongFilter = {
         ...filter,
-        $and: words.map((word) => ({
-          title: { $regex: `\\b${word}\\b`, $options: "i" },
+        $and: words.map(word => ({
+          title: { $regex: `\\b${word}\\b`, $options: 'i' },
         })),
       };
 
       // Weak filter: any word as substring
       const weakFilter = {
         ...filter,
-        $or: words.map((word) => ({
-          title: { $regex: word, $options: "i" },
+        $or: words.map(word => ({
+          title: { $regex: word, $options: 'i' },
         })),
       };
 
@@ -317,12 +300,8 @@ export const searchProductsController = async (req, res) => {
         // budget is string in schema, so use $expr to cast
         strongFilter.$expr = {
           $and: [
-            ...(min_budget
-              ? [{ $gte: [{ $toDouble: "$budget" }, Number(min_budget)] }]
-              : []),
-            ...(max_budget
-              ? [{ $lte: [{ $toDouble: "$budget" }, Number(max_budget)] }]
-              : []),
+            ...(min_budget ? [{ $gte: [{ $toDouble: '$budget' }, Number(min_budget)] }] : []),
+            ...(max_budget ? [{ $lte: [{ $toDouble: '$budget' }, Number(max_budget)] }] : []),
           ],
         };
         weakFilter.$expr = strongFilter.$expr;
@@ -332,20 +311,20 @@ export const searchProductsController = async (req, res) => {
       let sortObj = { createdAt: -1 }; // default: newly_added
       if (sort) {
         switch (sort) {
-          case "feature":
+          case 'feature':
             sortObj = { feature: -1, createdAt: -1 }; // assuming 'feature' field exists
             break;
-          case "aplhabetically_a_z":
+          case 'aplhabetically_a_z':
             sortObj = { title: 1 };
             break;
-          case "aplhabetically_z_a":
+          case 'aplhabetically_z_a':
             sortObj = { title: -1 };
             break;
-          case "low_to_high":
-            sortObj = { $expr: { $toDouble: "$budget" } }; // handled below
+          case 'low_to_high':
+            sortObj = { $expr: { $toDouble: '$budget' } }; // handled below
             break;
-          case "high_to_low":
-            sortObj = { $expr: { $toDouble: "$budget" } }; // handled below
+          case 'high_to_low':
+            sortObj = { $expr: { $toDouble: '$budget' } }; // handled below
             break;
           default:
             sortObj = { createdAt: -1 };
@@ -371,15 +350,15 @@ export const searchProductsController = async (req, res) => {
 
         {
           $addFields: {
-            budgetNum: { $toDouble: "$budget" },
+            budgetNum: { $toDouble: '$budget' },
           },
         },
 
         {
           $sort:
-            sort === "low_to_high"
+            sort === 'low_to_high'
               ? { budgetNum: 1 }
-              : sort === "high_to_low"
+              : sort === 'high_to_low'
                 ? { budgetNum: -1 }
                 : { createdAt: -1 },
         },
@@ -388,10 +367,10 @@ export const searchProductsController = async (req, res) => {
         { $limit: limitValue },
         {
           $lookup: {
-            from: "users", // must match your actual MongoDB collection name
-            localField: "userId",
-            foreignField: "_id",
-            as: "userId",
+            from: 'users', // must match your actual MongoDB collection name
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'userId',
             pipeline: [
               {
                 $project: {
@@ -405,17 +384,17 @@ export const searchProductsController = async (req, res) => {
         },
         {
           $unwind: {
-            path: "$userId",
+            path: '$userId',
             preserveNullAndEmptyArrays: true,
           },
         },
 
         {
           $lookup: {
-            from: "categories",
-            localField: "categoryId",
-            foreignField: "_id",
-            as: "categoryId",
+            from: 'categories',
+            localField: 'categoryId',
+            foreignField: '_id',
+            as: 'categoryId',
             pipeline: [
               {
                 $project: {
@@ -427,7 +406,7 @@ export const searchProductsController = async (req, res) => {
         },
         {
           $unwind: {
-            path: "$categoryId",
+            path: '$categoryId',
             preserveNullAndEmptyArrays: true,
           },
         },
@@ -441,52 +420,43 @@ export const searchProductsController = async (req, res) => {
           .find(weakFilter)
           .skip(skipValue)
           .limit(limitValue)
-          .populate({ path: "userId", select: "firstName lastName address" })
-          .populate({ path: "categoryId", select: "categoryName" })
+          .populate({ path: 'userId', select: 'firstName lastName address' })
+          .populate({ path: 'categoryId', select: 'categoryName' })
           .sort(
-            sort === "low_to_high"
-              ? { $expr: { $toDouble: "$budget" } }
-              : sort === "high_to_low"
-                ? { $expr: { $toDouble: "$budget" } }
-                : sortObj,
+            sort === 'low_to_high'
+              ? { $expr: { $toDouble: '$budget' } }
+              : sort === 'high_to_low'
+                ? { $expr: { $toDouble: '$budget' } }
+                : sortObj
           );
         total = await productSchema.countDocuments(weakFilter);
       }
 
       // For price sort, sort in-memory if needed (since $expr sort not supported in .sort)
-      if (sort === "low_to_high" || sort === "high_to_low") {
+      if (sort === 'low_to_high' || sort === 'high_to_low') {
         products = products.sort((a, b) => {
           const aBudget = Number(a.budget) || 0;
           const bBudget = Number(b.budget) || 0;
-          return sort === "low_to_high" ? aBudget - bBudget : bBudget - aBudget;
+          return sort === 'low_to_high' ? aBudget - bBudget : bBudget - aBudget;
         });
       }
 
-      return ApiResponse.successResponse(
-        res,
-        200,
-        "Products fetched successfully",
-        {
-          total,
-          totalPages: Math.ceil(total / limitValue),
-          page: pageValue,
-          limit: limitValue,
-          skip: skipValue,
-          products,
-        },
-      );
+      return ApiResponse.successResponse(res, 200, 'Products fetched successfully', {
+        total,
+        totalPages: Math.ceil(total / limitValue),
+        page: pageValue,
+        limit: limitValue,
+        skip: skipValue,
+        products,
+      });
     } else {
       // Category search (ignore title)
       // Budget filter
       if (min_budget || max_budget) {
         filter.$expr = {
           $and: [
-            ...(min_budget
-              ? [{ $gte: [{ $toDouble: "$budget" }, Number(min_budget)] }]
-              : []),
-            ...(max_budget
-              ? [{ $lte: [{ $toDouble: "$budget" }, Number(max_budget)] }]
-              : []),
+            ...(min_budget ? [{ $gte: [{ $toDouble: '$budget' }, Number(min_budget)] }] : []),
+            ...(max_budget ? [{ $lte: [{ $toDouble: '$budget' }, Number(max_budget)] }] : []),
           ],
         };
       }
@@ -495,19 +465,19 @@ export const searchProductsController = async (req, res) => {
       let sortObj = { createdAt: -1 }; // default: newly_added
       if (sort) {
         switch (sort) {
-          case "feature":
+          case 'feature':
             sortObj = { feature: -1, createdAt: -1 }; // assuming 'feature' field exists
             break;
-          case "aplhabetically_a_z":
+          case 'aplhabetically_a_z':
             sortObj = { title: 1 };
             break;
-          case "aplhabetically_z_a":
+          case 'aplhabetically_z_a':
             sortObj = { title: -1 };
             break;
-          case "low_to_high":
+          case 'low_to_high':
             sortObj = {}; // handled below
             break;
-          case "high_to_low":
+          case 'high_to_low':
             sortObj = {}; // handled below
             break;
           default:
@@ -519,40 +489,33 @@ export const searchProductsController = async (req, res) => {
         .find(filter)
         .skip(skipValue)
         .limit(limitValue)
-        .populate({ path: "userId", select: "firstName lastName address" })
-        .populate({ path: "categoryId", select: "categoryName" })
-        .sort(
-          sort === "low_to_high" ? {} : sort === "high_to_low" ? {} : sortObj,
-        );
+        .populate({ path: 'userId', select: 'firstName lastName address' })
+        .populate({ path: 'categoryId', select: 'categoryName' })
+        .sort(sort === 'low_to_high' ? {} : sort === 'high_to_low' ? {} : sortObj);
 
       let total = await productSchema.countDocuments(filter);
 
       // For price sort, sort in-memory if needed
-      if (sort === "low_to_high" || sort === "high_to_low") {
+      if (sort === 'low_to_high' || sort === 'high_to_low') {
         products = products.sort((a, b) => {
           const aBudget = Number(a.budget) || 0;
           const bBudget = Number(b.budget) || 0;
-          return sort === "low_to_high" ? aBudget - bBudget : bBudget - aBudget;
+          return sort === 'low_to_high' ? aBudget - bBudget : bBudget - aBudget;
         });
       }
 
-      return ApiResponse.successResponse(
-        res,
-        200,
-        "Products fetched successfully",
-        {
-          total,
-          totalPages: Math.ceil(total / limitValue),
-          page: pageValue,
-          limit: limitValue,
-          skip: skipValue,
-          products,
-        },
-      );
+      return ApiResponse.successResponse(res, 200, 'Products fetched successfully', {
+        total,
+        totalPages: Math.ceil(total / limitValue),
+        page: pageValue,
+        limit: limitValue,
+        skip: skipValue,
+        products,
+      });
     }
   } catch (error) {
-    console.error("Error in searchProductsController:", error);
-    return ApiResponse.errorResponse(res, 500, "Internal server error");
+    console.error('Error in searchProductsController:', error);
+    return ApiResponse.errorResponse(res, 500, 'Internal server error');
   }
 };
 
@@ -560,20 +523,20 @@ export const getProductById = async (req, res) => {
   try {
     const { productId } = req.params;
     if (!isValidObjectId(productId)) {
-      return ApiResponse.errorResponse(res, 400, "Invalid product ID");
+      return ApiResponse.errorResponse(res, 400, 'Invalid product ID');
     }
     let product = await productSchema
       .findById(productId)
-      .populate({ path: "userId", select: "firstName lastName address" })
-      .populate({ path: "categoryId", select: "categoryName" });
+      .populate({ path: 'userId', select: 'firstName lastName address' })
+      .populate({ path: 'categoryId', select: 'categoryName' });
 
     if (!product) {
-      return ApiResponse.errorResponse(res, 404, "Product not found");
+      return ApiResponse.errorResponse(res, 404, 'Product not found');
     }
 
     const getStatus = await closeDealSchema
       .findOne({ productId: productId })
-      .select("closedDealStatus")
+      .select('closedDealStatus')
       .lean();
 
     const dealStatus = getStatus?.closedDealStatus || null;
@@ -581,7 +544,7 @@ export const getProductById = async (req, res) => {
     const productObj = product.toObject();
     productObj.dealStatus = dealStatus;
 
-    return ApiResponse.successResponse(res, 200, "Product found", [
+    return ApiResponse.successResponse(res, 200, 'Product found', [
       {
         mainProduct: productObj,
       },

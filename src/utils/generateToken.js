@@ -1,3 +1,4 @@
-import jwt from "jsonwebtoken"
+import jwt from 'jsonwebtoken';
 
-export const generateToken = (payload)=>jwt.sign(payload, process.env.JWT_SECRET, {expiresIn: process.env.JWT_SECRET_EXPIRY});
+export const generateToken = payload =>
+  jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_SECRET_EXPIRY });

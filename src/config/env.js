@@ -15,4 +15,3 @@ const result = dotenv.config({
 if (result.error) {
   process.exit(1);
 }
-

@@ -1,22 +1,22 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const bidSchema = new mongoose.Schema(
   {
-    sellerId: { 
+    sellerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
 
     buyerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
 
     productId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
+      ref: 'Product',
       required: true,
     },
 
@@ -27,13 +27,13 @@ const bidSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["active", "inactive"],
-      default: "active",
+      enum: ['active', 'inactive'],
+      default: 'active',
     },
 
     availableBrand: {
       type: String,
-      default: "",
+      default: '',
     },
 
     earliestDeliveryDate: {
@@ -42,53 +42,53 @@ const bidSchema = new mongoose.Schema(
 
     sellerType: {
       type: String,
-      default: "",
+      default: '',
     },
 
     priceBasis: {
       type: String,
-      default: "",
+      default: '',
     },
 
     taxes: {
       type: String,
-      default: "",
+      default: '',
     },
 
     freightTerms: {
       type: String,
-      default: "",
+      default: '',
     },
 
     paymentTerms: {
       type: String,
-      default: "",
+      default: '',
     },
 
     location: {
       type: String,
-      default: "",
+      default: '',
     },
 
     buyerNote: {
       type: String,
-      default: "",
+      default: '',
     },
 
     businessType: {
       type: String,
-      enum: ["individual", "business"],
+      enum: ['individual', 'business'],
     },
 
     businessDets: {
-      company_name: { type: String, default: "" },
-      company_reg_num: { type: String, default: "" },
-      gst_num: { type: String, default: "" },
+      company_name: { type: String, default: '' },
+      company_reg_num: { type: String, default: '' },
+      gst_num: { type: String, default: '' },
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 bidSchema.index({ sellerId: 1, buyerId: 1, productId: 1 }, { unique: true });
 
-export default mongoose.model("Bid", bidSchema);
+export default mongoose.model('Bid', bidSchema);
