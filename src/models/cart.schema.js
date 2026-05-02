@@ -9,8 +9,12 @@ const cartItemSchema = new mongoose.Schema(
         required: true,
       },
     ],
+    addedAt: {
+      type: Date,
+      default: Date.now, 
+    },
   },
-  { _id: false }
+  { _id: true }
 );
 
 const cartSchema = new mongoose.Schema(
@@ -23,7 +27,7 @@ const cartSchema = new mongoose.Schema(
     },
     cartItems: [cartItemSchema],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default mongoose.model("Cart", cartSchema);

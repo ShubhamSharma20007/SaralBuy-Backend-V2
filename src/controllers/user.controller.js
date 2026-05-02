@@ -1,8 +1,7 @@
-
-import bcrypt from 'bcryptjs';
-import { ApiResponse } from '../helpers/ApiReponse.js';
-import userSchema from '../models/user.schema.js';
-
+import bcrypt from "bcryptjs";
+import { ApiResponse } from "../helpers/ApiReponse.js";
+import userSchema from "../models/user.schema.js";
+import uploadFile from "../config/imageKit.config.js";
 
 // const otpStore = new Map();
 
@@ -27,7 +26,6 @@ import userSchema from '../models/user.schema.js';
 //     return ApiResponse.errorResponse(res, 400, err?.message || err);
 //   }
 // };
-
 
 // export const verifyOtp = async (req, res) => {
 //   let { pNo, otp } = req.body;
@@ -66,7 +64,7 @@ import userSchema from '../models/user.schema.js';
 //     //   secure: process.env.NODE_ENV === 'production',
 //     //   // sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
 //     //   sameSite:'None',
-//     //   maxAge: 7 * 24 * 60 * 60 * 1000, 
+//     //   maxAge: 7 * 24 * 60 * 60 * 1000,
 //     //   path: '/',
 //     // });
 //     res.cookie('authToken',token,{
@@ -86,78 +84,93 @@ import userSchema from '../models/user.schema.js';
 //   }
 // };
 
-
-
 //  2 Factor OTP
 
 export const sendOtp = async (req, res) => {
   let { pNo } = req.body;
   try {
     const apiKey = process.env.FACTOR_MESSAGE_API;
-    pNo = pNo.startsWith('+') ? pNo.slice(1) : `91${pNo}`;
-    console.log('Phone Number:', pNo);
+    pNo = pNo.startsWith("+") ? pNo.slice(1) : `91${pNo}`;
+    console.log("Phone Number:", pNo);
 
     // Check for inactive users
     const findUser = await userSchema.findOne({
-      phone: new RegExp(`^\\+${pNo}$`, 'i'),
-      status: 'inactive',
-      role: 'user'
+      phone: new RegExp(`^\\+${pNo}$`, "i"),
+      status: "inactive",
+      role: "user",
     });
-    
+
     if (findUser) {
-      return ApiResponse.errorResponse(res, 400, "Your account is not active. Please contact to admin");
+      return ApiResponse.errorResponse(
+        res,
+        400,
+        "Your account is not active. Please contact to admin",
+      );
     }
     const apiUrl = `https://2factor.in/API/V1/${apiKey}/SMS/+${pNo}/AUTOGEN/SalarBuy`;
-    
-    console.log('Sending OTP to:', pNo);
-    console.log('API URL:', apiUrl);
-    
+
+    console.log("Sending OTP to:", pNo);
+    console.log("API URL:", apiUrl);
+
     const response = await fetch(apiUrl);
     const data = await response.json();
-    console.log('OTP response:', data);
+    console.log("OTP response:", data);
 
     if (data.Status !== "Success") {
-      return ApiResponse.errorResponse(res, 400, data.Details || "OTP sending failed");
+      return ApiResponse.errorResponse(
+        res,
+        400,
+        data.Details || "OTP sending failed",
+      );
     }
 
-    console.log('✅ OTP SENT SUCCESSFULLY via SMS');
-    
+    console.log("✅ OTP SENT SUCCESSFULLY via SMS");
+
     // Store the session ID to verify OTP later
     return ApiResponse.successResponse(res, 200, "OTP sent successfully", {
-      sessionId: data.Details // This is the session ID you'll need for verification
+      sessionId: data.Details, // This is the session ID you'll need for verification
     });
-
   } catch (err) {
     console.error("OTP sending error:", err);
-    return ApiResponse.errorResponse(res, 500, err?.message || "Internal server error");
+    return ApiResponse.errorResponse(
+      res,
+      500,
+      err?.message || "Internal server error",
+    );
   }
 };
-
 
 export const verifyOtp = async (req, res) => {
   let { pNo, otp, sessionId } = req.body;
 
   try {
     if (!pNo || !otp || !sessionId) {
-      return ApiResponse.errorResponse(res, 400, "Phone number, OTP, and sessionId are required");
+      return ApiResponse.errorResponse(
+        res,
+        400,
+        "Phone number, OTP, and sessionId are required",
+      );
     }
 
     const apiKey = process.env.FACTOR_MESSAGE_API;
 
-    pNo = pNo.startsWith('+') ? pNo.slice(1) : `91${pNo}`;
+    pNo = pNo.startsWith("+") ? pNo.slice(1) : `91${pNo}`;
 
     const apiUrl = `https://2factor.in/API/V1/${apiKey}/SMS/VERIFY/${sessionId}/${otp}`;
 
     const response = await fetch(apiUrl, {
-      method: 'GET'
+      method: "GET",
     });
 
     const data = await response.json();
 
     if (data.Status !== "Success") {
-      return ApiResponse.errorResponse(res, 400, data.Details || "OTP verification failed");
+      return ApiResponse.errorResponse(
+        res,
+        400,
+        data.Details || "OTP verification failed",
+      );
     }
-
 
     let user = await userSchema.findOne({ phone: `+${pNo}` });
     if (!user) {
@@ -165,36 +178,106 @@ export const verifyOtp = async (req, res) => {
     }
 
     const payload = { _id: user._id, phone: user.phone };
-    const token =  user.generateAuthToken()
-    user.lastLogin=new Date();
+    const token = user.generateAuthToken();
+    user.lastLogin = new Date();
     await user.save();
-    res.cookie('authToken', token, {
+    res.cookie("authToken", token, {
       sameSite: "none",
       httpOnly: true,
       secure: true,
-      path: '/'
+      path: "/",
     });
 
     return ApiResponse.successResponse(res, 200, "OTP verified successfully", {
       token,
-      user: { _id: user._id, phone: user.phone }
+      user: { _id: user._id, phone: user.phone },
     });
-
   } catch (err) {
     console.error("OTP verify error:", err);
-    return ApiResponse.errorResponse(res, 500, err?.message || "Internal server error");
+    return ApiResponse.errorResponse(
+      res,
+      500,
+      err?.message || "Internal server error",
+    );
   }
 };
-
 
 // Get user profile
 export const getProfile = async (req, res) => {
   try {
-    const user = await userSchema.findById(req.user._id).select('-password');
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const user = await userSchema.findById(req.user._id).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
     res.status(200).json(user);
   } catch (err) {
-    console.log(err)
+    console.log(err);
     res.status(400).json({ message: err.message });
+  }
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    let {
+      firstName,
+      lastName,
+      email,
+      phone,
+      aadhaarNumber,
+      address,
+      currentLocation,
+      businessName,
+    } = req.body;
+
+    const documentFile = req.files?.document?.[0];
+    const profilePic = req.files?.image?.[0];
+
+    let documentUrl = null;
+    let profilePicUrl = null;
+
+    if (documentFile) documentUrl = await uploadFile(documentFile);
+    if (profilePic) profilePicUrl = await uploadFile(profilePic);
+
+    if (email) {
+      const existingEmail = await userSchema.findOne({
+        email,
+        _id: { $ne: req.user.userId },
+      });
+      if (existingEmail)
+        return res.status(409).json({ message: "Email already in use" });
+    }
+
+    if (phone) {
+      const existingPhone = await userSchema.findOne({
+        phone,
+        _id: { $ne: req.user.userId },
+      });
+      if (existingPhone)
+        return res.status(409).json({ message: "Phone already in use" });
+    }
+
+    const updates = {};
+
+    if (firstName) updates.firstName = firstName;
+    if (lastName) updates.lastName = lastName;
+    if (email) updates.email = email;
+    if (phone) updates.phone = phone.startsWith("+") ? phone : `+91${phone}`;
+    if (documentUrl) updates.aadhaarImage = documentUrl;
+    if (address) updates.address = address;
+    if (aadhaarNumber) updates.aadhaarNumber = aadhaarNumber;
+    if (profilePicUrl) updates.profileImage = profilePicUrl;
+    if (currentLocation) updates.currentLocation = currentLocation;
+    if (businessName) updates.businessName = businessName;
+
+    const user = await userSchema
+      .findByIdAndUpdate(req.user.userId, updates, { new: true })
+      .select("-password");
+
+    return ApiResponse.successResponse(
+      res,
+      200,
+      "user updated successfully",
+      user,
+    );
+  } catch (err) {
+    return ApiResponse.errorResponse(res, 500, err.message, null);
   }
 };
