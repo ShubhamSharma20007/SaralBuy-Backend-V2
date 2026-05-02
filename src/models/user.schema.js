@@ -10,12 +10,12 @@ import jwt from 'jsonwebtoken';
 
 const userSchema = new mongoose.Schema(
   {
-    firstName: { type: String },
-    lastName: { type: String },
-    email: { type: String, unique: true, trim: true, sparse: true },
+    firstName: { type: String, trim: true },
+    lastName: { type: String, trim: true },
+    email: { type: String, unique: true, trim: true, sparse: true, lowercase: true },
     phone: { type: String, required: true },
     password: { type: String },
-    address: { type: String, default: null },
+    address: { type: String, default: null, trim: true },
     aadhaarNumber: { type: String },
     aadhaarImage: { type: String }, // file path or URL
     isAadhaarVerified: { type: Boolean, default: false },

@@ -9,7 +9,7 @@ import { allowUploadFields } from '../utils/multer.js';
 const router = express.Router();
 router.post('/send-otp', userController.sendOtp);
 router.post('/verify-otp', userController.verifyOtp);
-// router.post('/logout', auth, userController.logoutUser);
+router.get('/logout', auth, userController.logout);
 
 router.get('/profile', auth, userController.getProfile);
 router.post('/update-profile', auth, allowUploadFields(), userController.updateProfile);

@@ -227,7 +227,6 @@ export const getProductByName = async (req, res) => {
 
 export const searchProductsController = async (req, res) => {
   try {
-    // Accept both 'category' and 'categoryId' as query params
     const {
       title,
       category,
@@ -244,12 +243,59 @@ export const searchProductsController = async (req, res) => {
     const pageValue = Math.max(parseInt(page, 10), 1);
     const skipValue = skip ? parseInt(skip, 10) : (pageValue - 1) * limitValue;
 
+    // ─── Helper: mongoose sort object ────────────────────────────────────────
+    const buildSortObj = sort => {
+      switch (sort) {
+        case 'aplhabetically_a_z':
+          return { title: 1 };
+        case 'aplhabetically_z_a':
+          return { title: -1 };
+        case 'feature':
+          return { feature: -1, createdAt: -1 };
+        // low_to_high / high_to_low handled in-memory (budget is a String field)
+        default:
+          return { createdAt: -1 };
+      }
+    };
+
+    // ─── Helper: in-memory price sort (budget stored as String in schema) ────
+    const sortByBudget = (docs, direction) =>
+      [...docs].sort((a, b) => {
+        const aVal = Number(a.budget) || 0;
+        const bVal = Number(b.budget) || 0;
+        return direction === 'low_to_high' ? aVal - bVal : bVal - aVal;
+      });
+
+    // ─── Helper: budget $expr for .find() ────────────────────────────────────
+    const buildBudgetExpr = (min, max) => {
+      if (!min && !max) return null;
+      const conds = [];
+      if (min) conds.push({ $gte: [{ $toDouble: '$budget' }, Number(min)] });
+      if (max) conds.push({ $lte: [{ $toDouble: '$budget' }, Number(max)] });
+      return { $and: conds };
+    };
+
+    // ─── Helper: run find + populate ─────────────────────────────────────────
+    const fetchProducts = async (filter, sortObj) => {
+      const docs = await productSchema
+        .find(filter)
+        .populate({ path: 'userId', select: 'firstName lastName address' })
+        .populate({ path: 'categoryId', select: 'categoryName' })
+        .sort(sortObj)
+        .skip(skipValue)
+        .limit(limitValue)
+        .lean();
+
+      return docs;
+    };
+
+    // ─── Base filter ──────────────────────────────────────────────────────────
     let filter = { draft: false };
     let useTitleSearch = true;
 
-    // If category or categoryId is present, ignore title and search by categoryId only
     const catId = category || categoryId;
     const subCatId = req.query.subCategoryId;
+
     if (catId) {
       if (!isValidObjectId(catId)) {
         return ApiResponse.errorResponse(res, 400, 'Invalid categoryId');
@@ -257,6 +303,7 @@ export const searchProductsController = async (req, res) => {
       filter.categoryId = new mongoose.Types.ObjectId(catId);
       useTitleSearch = false;
     }
+
     if (subCatId) {
       if (!isValidObjectId(subCatId)) {
         return ApiResponse.errorResponse(res, 400, 'Invalid subCategoryId');
@@ -265,7 +312,15 @@ export const searchProductsController = async (req, res) => {
       useTitleSearch = false;
     }
 
-    // If not searching by category, require title
+    const isPriceSort = sort === 'low_to_high' || sort === 'high_to_low';
+    const sortObj = isPriceSort ? { createdAt: -1 } : buildSortObj(sort);
+
+    const budgetExpr = buildBudgetExpr(min_budget, max_budget);
+    if (budgetExpr) filter.$expr = budgetExpr;
+
+    // ════════════════════════════════════════════════════════════════════════
+    // BRANCH A — Title search
+    // ════════════════════════════════════════════════════════════════════════
     if (useTitleSearch) {
       if (!title || typeof title !== 'string' || title.trim().length < 2) {
         return ApiResponse.errorResponse(
@@ -274,235 +329,32 @@ export const searchProductsController = async (req, res) => {
           'Valid product title is required (min 2 characters)'
         );
       }
+
       const words = title.trim().split(/\s+/);
 
-      // Strong filter: all words as whole words
+      // Strong: all words must match as whole words
       const strongFilter = {
         ...filter,
-        $and: words.map(word => ({
-          title: { $regex: `\\b${word}\\b`, $options: 'i' },
-        })),
+        $and: words.map(w => ({ title: { $regex: `\\b${w}\\b`, $options: 'i' } })),
       };
 
-      // Weak filter: any word as substring
+      // Weak: any word matches as substring
       const weakFilter = {
         ...filter,
-        $or: words.map(word => ({
-          title: { $regex: word, $options: 'i' },
-        })),
+        $or: words.map(w => ({ title: { $regex: w, $options: 'i' } })),
       };
 
-      // Budget filter (applies to both strong/weak)
-      if (min_budget || max_budget) {
-        const budgetCond = {};
-        if (min_budget) budgetCond.$gte = Number(min_budget);
-        if (max_budget) budgetCond.$lte = Number(max_budget);
-        // budget is string in schema, so use $expr to cast
-        strongFilter.$expr = {
-          $and: [
-            ...(min_budget ? [{ $gte: [{ $toDouble: '$budget' }, Number(min_budget)] }] : []),
-            ...(max_budget ? [{ $lte: [{ $toDouble: '$budget' }, Number(max_budget)] }] : []),
-          ],
-        };
-        weakFilter.$expr = strongFilter.$expr;
-      }
-
-      // Sorting
-      let sortObj = { createdAt: -1 }; // default: newly_added
-      if (sort) {
-        switch (sort) {
-          case 'feature':
-            sortObj = { feature: -1, createdAt: -1 }; // assuming 'feature' field exists
-            break;
-          case 'aplhabetically_a_z':
-            sortObj = { title: 1 };
-            break;
-          case 'aplhabetically_z_a':
-            sortObj = { title: -1 };
-            break;
-          case 'low_to_high':
-            sortObj = { $expr: { $toDouble: '$budget' } }; // handled below
-            break;
-          case 'high_to_low':
-            sortObj = { $expr: { $toDouble: '$budget' } }; // handled below
-            break;
-          default:
-            sortObj = { createdAt: -1 };
-        }
-      }
-
-      // Query with strong filter first
-      //   let products = await productSchema
-      //     .find(strongFilter)
-      //     .skip(skipValue)
-      //     .limit(limitValue)
-      //     .populate({ path: "userId", select: "firstName lastName address" })
-      //     .populate({ path: "categoryId", select: "categoryName" })
-      //     .sort(
-      //       sort === "low_to_high"
-      //         ? { $expr: { $toDouble: "$budget" } }
-      //         : sort === "high_to_low"
-      //           ? { $expr: { $toDouble: "$budget" } }
-      //           : sortObj,
-      //     );
-      let products = await productSchema.aggregate([
-        { $match: strongFilter },
-
-        {
-          $addFields: {
-            budgetNum: { $toDouble: '$budget' },
-          },
-        },
-
-        {
-          $sort:
-            sort === 'low_to_high'
-              ? { budgetNum: 1 }
-              : sort === 'high_to_low'
-                ? { budgetNum: -1 }
-                : { createdAt: -1 },
-        },
-
-        { $skip: skipValue },
-        { $limit: limitValue },
-        {
-          $lookup: {
-            from: 'users', // must match your actual MongoDB collection name
-            localField: 'userId',
-            foreignField: '_id',
-            as: 'userId',
-            pipeline: [
-              {
-                $project: {
-                  firstName: 1,
-                  lastName: 1,
-                  address: 1,
-                },
-              },
-            ],
-          },
-        },
-        {
-          $unwind: {
-            path: '$userId',
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-
-        {
-          $lookup: {
-            from: 'categories',
-            localField: 'categoryId',
-            foreignField: '_id',
-            as: 'categoryId',
-            pipeline: [
-              {
-                $project: {
-                  categoryName: 1,
-                },
-              },
-            ],
-          },
-        },
-        {
-          $unwind: {
-            path: '$categoryId',
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-      ]);
-
+      let products = await fetchProducts(strongFilter, sortObj);
       let total = await productSchema.countDocuments(strongFilter);
 
-      // If no products, try weak filter
+      // Fallback to weak filter
       if (products.length === 0) {
-        products = await productSchema
-          .find(weakFilter)
-          .skip(skipValue)
-          .limit(limitValue)
-          .populate({ path: 'userId', select: 'firstName lastName address' })
-          .populate({ path: 'categoryId', select: 'categoryName' })
-          .sort(
-            sort === 'low_to_high'
-              ? { $expr: { $toDouble: '$budget' } }
-              : sort === 'high_to_low'
-                ? { $expr: { $toDouble: '$budget' } }
-                : sortObj
-          );
+        products = await fetchProducts(weakFilter, sortObj);
         total = await productSchema.countDocuments(weakFilter);
       }
 
-      // For price sort, sort in-memory if needed (since $expr sort not supported in .sort)
-      if (sort === 'low_to_high' || sort === 'high_to_low') {
-        products = products.sort((a, b) => {
-          const aBudget = Number(a.budget) || 0;
-          const bBudget = Number(b.budget) || 0;
-          return sort === 'low_to_high' ? aBudget - bBudget : bBudget - aBudget;
-        });
-      }
-
-      return ApiResponse.successResponse(res, 200, 'Products fetched successfully', {
-        total,
-        totalPages: Math.ceil(total / limitValue),
-        page: pageValue,
-        limit: limitValue,
-        skip: skipValue,
-        products,
-      });
-    } else {
-      // Category search (ignore title)
-      // Budget filter
-      if (min_budget || max_budget) {
-        filter.$expr = {
-          $and: [
-            ...(min_budget ? [{ $gte: [{ $toDouble: '$budget' }, Number(min_budget)] }] : []),
-            ...(max_budget ? [{ $lte: [{ $toDouble: '$budget' }, Number(max_budget)] }] : []),
-          ],
-        };
-      }
-
-      // Sorting
-      let sortObj = { createdAt: -1 }; // default: newly_added
-      if (sort) {
-        switch (sort) {
-          case 'feature':
-            sortObj = { feature: -1, createdAt: -1 }; // assuming 'feature' field exists
-            break;
-          case 'aplhabetically_a_z':
-            sortObj = { title: 1 };
-            break;
-          case 'aplhabetically_z_a':
-            sortObj = { title: -1 };
-            break;
-          case 'low_to_high':
-            sortObj = {}; // handled below
-            break;
-          case 'high_to_low':
-            sortObj = {}; // handled below
-            break;
-          default:
-            sortObj = { createdAt: -1 };
-        }
-      }
-
-      let products = await productSchema
-        .find(filter)
-        .skip(skipValue)
-        .limit(limitValue)
-        .populate({ path: 'userId', select: 'firstName lastName address' })
-        .populate({ path: 'categoryId', select: 'categoryName' })
-        .sort(sort === 'low_to_high' ? {} : sort === 'high_to_low' ? {} : sortObj);
-
-      let total = await productSchema.countDocuments(filter);
-
-      // For price sort, sort in-memory if needed
-      if (sort === 'low_to_high' || sort === 'high_to_low') {
-        products = products.sort((a, b) => {
-          const aBudget = Number(a.budget) || 0;
-          const bBudget = Number(b.budget) || 0;
-          return sort === 'low_to_high' ? aBudget - bBudget : bBudget - aBudget;
-        });
-      }
+      // In-memory price sort (because budget is a String in the schema)
+      if (isPriceSort) products = sortByBudget(products, sort);
 
       return ApiResponse.successResponse(res, 200, 'Products fetched successfully', {
         total,
@@ -513,6 +365,23 @@ export const searchProductsController = async (req, res) => {
         products,
       });
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // BRANCH B — Category / subCategory search
+    // ════════════════════════════════════════════════════════════════════════
+    let products = await fetchProducts(filter, sortObj);
+    const total = await productSchema.countDocuments(filter);
+
+    if (isPriceSort) products = sortByBudget(products, sort);
+
+    return ApiResponse.successResponse(res, 200, 'Products fetched successfully', {
+      total,
+      totalPages: Math.ceil(total / limitValue),
+      page: pageValue,
+      limit: limitValue,
+      skip: skipValue,
+      products,
+    });
   } catch (error) {
     console.error('Error in searchProductsController:', error);
     return ApiResponse.errorResponse(res, 500, 'Internal server error');

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "cross-env NODE_ENV=local nodemon ./server.js --enable-turbo-mode",
+    "dev": "cross-env NODE_ENV=development nodemon ./server.js --enable-turbo-mode",
     "start": "cross-env NODE_ENV=production node ./server.js --enable-turbo-mode",
     "format": "prettier --write ."
   },
