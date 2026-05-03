@@ -8,6 +8,7 @@ export default function mongoCtx() {
   connection = mongoose
     .connect(process.env.DB_CTX, {
       dbName: 'saralbuy',
+      maxPoolSize: 10,
     })
     .then(() => {
       console.log('Connected DB:', mongoose.connection.name);

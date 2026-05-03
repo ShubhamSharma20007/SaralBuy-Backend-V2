@@ -4,6 +4,7 @@ import uploadFile from '../config/imageKit.config.js';
 import { ApiResponse } from '../helpers/ApiReponse.js';
 import productSchema from '../models/product.schema.js';
 import closeDealSchema from '../models/closeDeal.schema.js';
+import { upload } from '@imagekit/javascript';
 
 export const addProduct = async (req, res) => {
   try {
@@ -65,27 +66,19 @@ export const addProduct = async (req, res) => {
 export const getTrendingCategory = async (req, res) => {
   try {
     const trendingProducts = await productSchema.aggregate([
-      {
-        $match: {
-          draft: false,
-        },
-      },
-      { $sort: { createdAt: -1 } },
+      { $match: { draft: false } },
       {
         $group: {
           _id: '$categoryId',
           count: { $sum: 1 },
-          product: { $first: '$$ROOT' },
+          latestProductId: { $max: '$_id' },
+          latestCreatedAt: { $max: '$createdAt' },
         },
       },
-      {
-        $sort: {
-          count: -1,
-        },
-      },
-      {
-        $limit: 5,
-      },
+
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+
       {
         $lookup: {
           from: 'categories',
@@ -94,9 +87,7 @@ export const getTrendingCategory = async (req, res) => {
           as: 'category',
         },
       },
-      {
-        $unwind: '$category',
-      },
+      { $unwind: '$category' },
 
       {
         $project: {
@@ -106,15 +97,18 @@ export const getTrendingCategory = async (req, res) => {
             categoryName: '$category.categoryName',
             image: '$category.image',
           },
-          productId: '$product._id',
+          productCount: '$count',
+          latestProductId: 1,
+          latestCreatedAt: 1,
         },
       },
     ]);
+
     return ApiResponse.successResponse(res, 200, 'Trending categories', trendingProducts);
   } catch (error) {
     return ApiResponse.errorResponse(
       res,
-      400,
+      500,
       error.message || 'Failed to get trending categories'
     );
   }
@@ -122,27 +116,8 @@ export const getTrendingCategory = async (req, res) => {
 
 export const getHomeProducts = async (req, res) => {
   try {
-    const topCategories = await productSchema.aggregate([
-      { $match: { draft: false } },
-      {
-        $group: {
-          _id: '$categoryId',
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { count: -1 } },
-      { $limit: 2 },
-    ]);
-
-    const topCategoryIds = topCategories.map(c => c._id);
     const topProductsPerCategory = await productSchema.aggregate([
-      {
-        $match: {
-          categoryId: { $in: topCategoryIds },
-          draft: false,
-        },
-      },
-      // Populate category info
+      { $match: { draft: false } },
       {
         $lookup: {
           from: 'categories',
@@ -153,7 +128,6 @@ export const getHomeProducts = async (req, res) => {
       },
       { $unwind: '$categoryInfo' },
 
-      // Populate user info
       {
         $lookup: {
           from: 'users',
@@ -168,14 +142,20 @@ export const getHomeProducts = async (req, res) => {
         $group: {
           _id: '$categoryId',
           categoryName: { $first: '$categoryInfo.categoryName' },
+          totalCount: { $sum: 1 },
           products: { $push: '$$ROOT' },
         },
       },
+
+      { $sort: { totalCount: -1 } },
+      { $limit: 2 },
+
       {
         $project: {
           _id: 1,
           categoryName: 1,
-          products: { $slice: ['$products', 3] },
+          totalCount: 1,
+          products: { $slice: ['$products', 2] },
         },
       },
     ]);
@@ -191,7 +171,6 @@ export const getHomeProducts = async (req, res) => {
     return ApiResponse.errorResponse(res, 500, error.message || 'Failed to fetch products');
   }
 };
-
 export const getProductByName = async (req, res) => {
   try {
     const { productName } = req.params;
@@ -421,5 +400,297 @@ export const getProductById = async (req, res) => {
   } catch (error) {
     console.error(error);
     return ApiResponse.errorResponse(res, 500, error.message);
+  }
+};
+
+export const getAllDraftProducts = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return ApiResponse.errorResponse(res, 400, 'User not authenticated');
+    }
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Fetch draft products only (NO multi-product)
+    const [products, total] = await Promise.all([
+      productSchema
+        .find({ draft: true, userId })
+        .populate('categoryId')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
+      productSchema.countDocuments({ draft: true, userId }),
+    ]);
+
+    // Clean product
+    const cleanProduct = prod => {
+      if (!prod) return prod;
+
+      const p = { ...prod };
+
+      delete p.__v;
+
+      if (p.categoryId) {
+        p.categoryId = {
+          _id: p.categoryId._id,
+          categoryName: p.categoryId.categoryName,
+          image: p.categoryId.image,
+          updatedAt: p.categoryId.updatedAt,
+        };
+      }
+
+      return {
+        ...p,
+        subProducts: [],
+      };
+    };
+
+    const result = products.map(cleanProduct);
+
+    return ApiResponse.successResponse(res, 200, 'Draft products fetched successfully', {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
+    return ApiResponse.errorResponse(res, 500, error.message || 'Failed to fetch draft products');
+  }
+};
+
+export const deleteDraftProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const deletedProduct = await productSchema.deleteOne({ _id: productId, draft: true });
+    if (deletedProduct.deletedCount === 0) {
+      return ApiResponse.errorResponse(res, 404, 'Product not found');
+    }
+    return ApiResponse.successResponse(res, 200, 'Product deleted successfully', deletedProduct);
+  } catch (error) {
+    return ApiResponse.errorResponse(res, 400, error.message || 'Failed to delete product');
+  }
+};
+
+export const getDraftProductById = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const userId = req.user?._id || req.user?.userId;
+
+    if (!userId) {
+      return ApiResponse.errorResponse(res, 400, 'User not authenticated');
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return ApiResponse.errorResponse(res, 400, 'Invalid product ID');
+    }
+
+    const product = await productSchema
+      .findOne({
+        _id: productId,
+        draft: true,
+        userId: userId,
+      })
+      .populate({
+        path: 'categoryId',
+        select: '-subCategories',
+      })
+      .lean();
+
+    if (!product) {
+      return ApiResponse.errorResponse(res, 404, 'Draft product not found');
+    }
+
+    // clean product
+    const cleanProduct = prod => {
+      if (!prod) return prod;
+      const p = { ...prod };
+
+      if (p.subCategoryId?._id) {
+        p.subCategoryId = p.subCategoryId._id;
+      }
+
+      delete p.__v;
+      return p;
+    };
+
+    return ApiResponse.successResponse(
+      res,
+      200,
+      'Draft product fetched successfully',
+      cleanProduct(product)
+    );
+  } catch (error) {
+    console.error(error);
+    return ApiResponse.errorResponse(res, 500, error.message || 'Failed to fetch draft product');
+  }
+};
+
+export const updateDraftStatus = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return ApiResponse.errorResponse(res, 400, 'User not authenticated');
+    }
+
+    const { productId, ...updateFields } = req.body;
+
+    if (!productId && products) {
+      try {
+        const parsed = typeof products === 'string' ? JSON.parse(products) : products;
+        productId = parsed?.[0]?._id;
+      } catch (e) {}
+    }
+
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+      return ApiResponse.errorResponse(res, 400, 'Valid productId is required');
+    }
+
+    // check product exists
+    const product = await productSchema.findById(productId);
+    if (!product) {
+      return ApiResponse.errorResponse(res, 404, 'Product not found');
+    }
+
+    // check ownership
+    if (product.userId.toString() !== userId) {
+      return ApiResponse.errorResponse(res, 403, 'Not authorized');
+    }
+
+    // parse paymentAndDelivery if needed
+    if (typeof updateFields.paymentAndDelivery === 'string') {
+      try {
+        updateFields.paymentAndDelivery = JSON.parse(updateFields.paymentAndDelivery);
+      } catch (e) {}
+    }
+
+    // handle files
+    let imageUrl = null;
+    let documentUrl = null;
+
+    if (req.files?.image?.[0]) {
+      imageUrl = await uploadFile(req.files.image[0]);
+    }
+
+    if (req.files?.document?.[0]) {
+      documentUrl = await uploadFile(req.files.document[0]);
+    }
+
+    const updatePayload = {
+      ...updateFields,
+      draft: false,
+    };
+
+    if (imageUrl) updatePayload.image = imageUrl;
+    if (documentUrl) updatePayload.document = documentUrl;
+
+    // update product
+    const updatedProduct = await productSchema.findByIdAndUpdate(productId, updatePayload, {
+      new: true,
+    });
+
+    // ✅ create requirement (single)
+    try {
+      await requirementSchema.create({
+        productId: updatedProduct._id,
+        buyerId: userId,
+        sellers: [],
+      });
+    } catch (err) {
+      console.error('[Requirement Error]', err.message);
+    }
+
+    return ApiResponse.successResponse(res, 200, 'Product published successfully', updatedProduct);
+  } catch (err) {
+    console.error(err);
+    return ApiResponse.errorResponse(res, 500, err.message || 'Something went wrong');
+  }
+};
+
+export const saveAsDraft = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return ApiResponse.errorResponse(res, 400, 'User not authenticated');
+    }
+
+    let { productId, ...updateFields } = req.body;
+
+    if (!productId && products) {
+      try {
+        const parsed = typeof products === 'string' ? JSON.parse(products) : products;
+        productId = parsed?.[0]?._id;
+      } catch (e) {}
+    }
+    console.log(req.body);
+
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+      return ApiResponse.errorResponse(res, 400, 'Valid productId is required');
+    }
+
+    // check product exists
+    const product = await productSchema.findById(productId);
+    if (!product) {
+      return ApiResponse.errorResponse(res, 404, 'Product not found');
+    }
+
+    // check ownership
+    if (product.userId.toString() !== userId) {
+      return ApiResponse.errorResponse(res, 403, 'Not authorized');
+    }
+
+    // parse JSON field
+    if (typeof updateFields.paymentAndDelivery === 'string') {
+      try {
+        updateFields.paymentAndDelivery = JSON.parse(updateFields.paymentAndDelivery);
+      } catch (e) {}
+    }
+
+    // handle files (single)
+    let imageUrl = null;
+    let documentUrl = null;
+
+    if (req.files?.image?.[0]) {
+      const file = req.files.image[0];
+      imageUrl = await uploadFile(file);
+
+      if (file.key) {
+        updateFields.imageKey = file.key;
+      }
+    }
+
+    if (req.files?.document?.[0]) {
+      const file = req.files.document[0];
+      documentUrl = await uploadFile(file);
+    }
+
+    // update payload
+    const updatePayload = {
+      ...updateFields,
+      draft: true,
+    };
+
+    if (imageUrl) updatePayload.image = imageUrl;
+    if (documentUrl) updatePayload.document = documentUrl;
+
+    // update product
+    const updatedProduct = await productSchema.findByIdAndUpdate(
+      productId,
+      { $set: updatePayload },
+      { new: true }
+    );
+
+    return ApiResponse.successResponse(res, 200, 'Draft saved successfully', updatedProduct);
+  } catch (error) {
+    console.error('Error saving draft:', error);
+    return ApiResponse.errorResponse(res, 500, error.message || 'Failed to save draft');
   }
 };
