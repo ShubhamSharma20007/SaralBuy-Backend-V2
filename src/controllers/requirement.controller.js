@@ -398,3 +398,82 @@ export const getCompletedApprovedRequirements = async (req, res) => {
     );
   }
 };
+
+export const getRequirementById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return ApiResponse.errorResponse(res, 400, 'Invalid requirement ID');
+    }
+
+    if (!userId) {
+      return ApiResponse.errorResponse(res, 400, 'User not authenticated');
+    }
+
+    const requirement = await requirementSchema
+      .findById(id)
+      .populate({
+        path: 'productId',
+        populate: { path: 'categoryId', select: '-subCategories' },
+      })
+      .populate('buyerId')
+      .populate({
+        path: 'sellers.sellerId',
+        select: '-password -__v',
+      })
+      .lean();
+
+    if (!requirement) {
+      return ApiResponse.errorResponse(res, 404, 'Requirement not found');
+    }
+
+    const isBuyer = requirement.buyerId._id.toString() === userId;
+    const isSeller = requirement.sellers.some(s => s.sellerId._id.toString() === userId);
+
+    if (!isBuyer && !isSeller) {
+      return ApiResponse.errorResponse(res, 403, 'Access denied');
+    }
+
+    const cleanProduct = prod => {
+      if (!prod) return prod;
+      const p = { ...prod };
+
+      if (p.userId?._id) p.userId = p.userId._id.toString();
+      if (p.subCategoryId?._id) p.subCategoryId = p.subCategoryId._id;
+
+      delete p.__v;
+      return p;
+    };
+
+    const formatDate = date => {
+      if (!date) return null;
+      const d = new Date(date);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        '0'
+      )}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    const responseObj = {
+      _id: requirement._id,
+      status: requirement.status,
+      createdAt: requirement.createdAt,
+      updatedAt: requirement.updatedAt,
+      product: requirement.productId ? cleanProduct(requirement.productId) : null,
+      buyer: requirement.buyerId,
+      sellers:
+        requirement.sellers?.map(s => ({
+          seller: s.sellerId,
+          budgetAmount: s.budgetAmount,
+          date: formatDate(s.createdAt || requirement.createdAt),
+        })) || [],
+    };
+
+    return ApiResponse.successResponse(res, 200, 'Requirement fetched successfully', responseObj);
+  } catch (err) {
+    console.error(err);
+    return ApiResponse.errorResponse(res, 500, err.message || 'Failed to fetch requirement');
+  }
+};

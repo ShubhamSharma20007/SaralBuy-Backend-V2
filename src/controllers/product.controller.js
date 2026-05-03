@@ -5,6 +5,7 @@ import { ApiResponse } from '../helpers/ApiReponse.js';
 import productSchema from '../models/product.schema.js';
 import closeDealSchema from '../models/closeDeal.schema.js';
 import { upload } from '@imagekit/javascript';
+import requirementSchema from '../models/requirement.schema.js';
 
 export const addProduct = async (req, res) => {
   try {
@@ -56,6 +57,15 @@ export const addProduct = async (req, res) => {
       paymentAndDelivery: body.paymentAndDelivery,
       bidActiveDuration: body.bidActiveDuration,
     });
+
+    // create a requirement
+    await requirementSchema.create([
+      {
+        productId: product._id,
+        buyerId: req.user._id,
+        sellers: [],
+      },
+    ]);
 
     return ApiResponse.successResponse(res, 201, 'Product created successfully', product);
   } catch (error) {
@@ -205,6 +215,171 @@ export const getProductByName = async (req, res) => {
   }
 };
 
+// export const searchProductsController = async (req, res) => {
+//   try {
+//     const {
+//       title,
+//       category,
+//       categoryId,
+//       sort,
+//       min_budget,
+//       max_budget,
+//       page = 1,
+//       limit = 10,
+//       skip,
+//     } = req.query;
+
+//     const limitValue = Math.max(parseInt(limit, 10), 1);
+//     const pageValue = Math.max(parseInt(page, 10), 1);
+//     const skipValue = skip ? parseInt(skip, 10) : (pageValue - 1) * limitValue;
+
+//     console.log(req.query,3434)
+
+//     // ─── Helper: mongoose sort object ────────────────────────────────────────
+//     const buildSortObj = sort => {
+//       switch (sort) {
+//         case 'aplhabetically_a_z':
+//           return { title: 1 };
+//         case 'aplhabetically_z_a':
+//           return { title: -1 };
+//         case 'feature':
+//           return { feature: -1, createdAt: -1 };
+//         // low_to_high / high_to_low handled in-memory (budget is a String field)
+//         default:
+//           return { createdAt: -1 };
+//       }
+//     };
+
+//     // ─── Helper: in-memory price sort (budget stored as String in schema) ────
+//     const sortByBudget = (docs, direction) =>
+//       [...docs].sort((a, b) => {
+//         const aVal = Number(a.budget) || 0;
+//         const bVal = Number(b.budget) || 0;
+//         return direction === 'low_to_high' ? aVal - bVal : bVal - aVal;
+//       });
+
+//     // ─── Helper: budget $expr for .find() ────────────────────────────────────
+//     const buildBudgetExpr = (min, max) => {
+//       if (!min && !max) return null;
+//       const conds = [];
+//       if (min) conds.push({ $gte: [{ $toDouble: '$budget' }, Number(min)] });
+//       if (max) conds.push({ $lte: [{ $toDouble: '$budget' }, Number(max)] });
+//       return { $and: conds };
+//     };
+
+//     // ─── Helper: run find + populate ─────────────────────────────────────────
+//     const fetchProducts = async (filter, sortObj) => {
+//       const docs = await productSchema
+//         .find(filter)
+//         .populate({ path: 'userId', select: 'firstName lastName address' })
+//         .populate({ path: 'categoryId', select: 'categoryName' })
+//         .sort(sortObj)
+//         .skip(skipValue)
+//         .limit(limitValue)
+//         .lean();
+
+//       return docs;
+//     };
+
+//     // ─── Base filter ──────────────────────────────────────────────────────────
+//     let filter = { draft: false };
+//     let useTitleSearch = true;
+
+//     const catId = category || categoryId;
+//     const subCatId = req.query.subCategoryId;
+
+//     if (catId) {
+//       if (!isValidObjectId(catId)) {
+//         return ApiResponse.errorResponse(res, 400, 'Invalid categoryId');
+//       }
+//       filter.categoryId = new mongoose.Types.ObjectId(catId);
+//       useTitleSearch = false;
+//     }
+
+//     if (subCatId) {
+//       if (!isValidObjectId(subCatId)) {
+//         return ApiResponse.errorResponse(res, 400, 'Invalid subCategoryId');
+//       }
+//       filter.subCategoryId = new mongoose.Types.ObjectId(subCatId);
+//       useTitleSearch = false;
+//     }
+
+//     const isPriceSort = sort === 'low_to_high' || sort === 'high_to_low';
+//     const sortObj = isPriceSort ? { createdAt: -1 } : buildSortObj(sort);
+
+//     const budgetExpr = buildBudgetExpr(min_budget, max_budget);
+//     if (budgetExpr) filter.$expr = budgetExpr;
+
+//     // ════════════════════════════════════════════════════════════════════════
+//     // BRANCH A — Title search
+//     // ════════════════════════════════════════════════════════════════════════
+//     if (useTitleSearch) {
+//       if (!title || typeof title !== 'string' || title.trim().length < 2) {
+//         return ApiResponse.errorResponse(
+//           res,
+//           400,
+//           'Valid product title is required (min 2 characters)'
+//         );
+//       }
+
+//       const words = title.trim().split(/\s+/);
+
+//       // Strong: all words must match as whole words
+//       const strongFilter = {
+//         ...filter,
+//         $and: words.map(w => ({ title: { $regex: `\\b${w}\\b`, $options: 'i' } })),
+//       };
+
+//       // Weak: any word matches as substring
+//       const weakFilter = {
+//         ...filter,
+//         $or: words.map(w => ({ title: { $regex: w, $options: 'i' } })),
+//       };
+
+//       let products = await fetchProducts(strongFilter, sortObj);
+//       let total = await productSchema.countDocuments(strongFilter);
+
+//       // Fallback to weak filter
+//       if (products.length === 0) {
+//         products = await fetchProducts(weakFilter, sortObj);
+//         total = await productSchema.countDocuments(weakFilter);
+//       }
+
+//       // In-memory price sort (because budget is a String in the schema)
+//       if (isPriceSort) products = sortByBudget(products, sort);
+
+//       return ApiResponse.successResponse(res, 200, 'Products fetched successfully', {
+//         total,
+//         totalPages: Math.ceil(total / limitValue),
+//         page: pageValue,
+//         limit: limitValue,
+//         skip: skipValue,
+//         products,
+//       });
+//     }
+
+//     // ════════════════════════════════════════════════════════════════════════
+//     // BRANCH B — Category / subCategory search
+//     // ════════════════════════════════════════════════════════════════════════
+//     let products = await fetchProducts(filter, sortObj);
+//     const total = await productSchema.countDocuments(filter);
+
+//     if (isPriceSort) products = sortByBudget(products, sort);
+
+//     return ApiResponse.successResponse(res, 200, 'Products fetched successfully', {
+//       total,
+//       totalPages: Math.ceil(total / limitValue),
+//       page: pageValue,
+//       limit: limitValue,
+//       skip: skipValue,
+//       products,
+//     });
+//   } catch (error) {
+//     console.error('Error in searchProductsController:', error);
+//     return ApiResponse.errorResponse(res, 500, 'Internal server error');
+//   }
+// };
+
 export const searchProductsController = async (req, res) => {
   try {
     const {
@@ -223,7 +398,7 @@ export const searchProductsController = async (req, res) => {
     const pageValue = Math.max(parseInt(page, 10), 1);
     const skipValue = skip ? parseInt(skip, 10) : (pageValue - 1) * limitValue;
 
-    // ─── Helper: mongoose sort object ────────────────────────────────────────
+    // ─── Helpers ──────────────────────────────────────────────────────────────
     const buildSortObj = sort => {
       switch (sort) {
         case 'aplhabetically_a_z':
@@ -232,13 +407,11 @@ export const searchProductsController = async (req, res) => {
           return { title: -1 };
         case 'feature':
           return { feature: -1, createdAt: -1 };
-        // low_to_high / high_to_low handled in-memory (budget is a String field)
         default:
           return { createdAt: -1 };
       }
     };
 
-    // ─── Helper: in-memory price sort (budget stored as String in schema) ────
     const sortByBudget = (docs, direction) =>
       [...docs].sort((a, b) => {
         const aVal = Number(a.budget) || 0;
@@ -246,7 +419,6 @@ export const searchProductsController = async (req, res) => {
         return direction === 'low_to_high' ? aVal - bVal : bVal - aVal;
       });
 
-    // ─── Helper: budget $expr for .find() ────────────────────────────────────
     const buildBudgetExpr = (min, max) => {
       if (!min && !max) return null;
       const conds = [];
@@ -255,9 +427,11 @@ export const searchProductsController = async (req, res) => {
       return { $and: conds };
     };
 
-    // ─── Helper: run find + populate ─────────────────────────────────────────
+    // ✅ Escape all regex special chars so "-", ".", "(", ")" etc. are safe
+    const escapeRegex = str => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     const fetchProducts = async (filter, sortObj) => {
-      const docs = await productSchema
+      return productSchema
         .find(filter)
         .populate({ path: 'userId', select: 'firstName lastName address' })
         .populate({ path: 'categoryId', select: 'categoryName' })
@@ -265,8 +439,6 @@ export const searchProductsController = async (req, res) => {
         .skip(skipValue)
         .limit(limitValue)
         .lean();
-
-      return docs;
     };
 
     // ─── Base filter ──────────────────────────────────────────────────────────
@@ -277,17 +449,14 @@ export const searchProductsController = async (req, res) => {
     const subCatId = req.query.subCategoryId;
 
     if (catId) {
-      if (!isValidObjectId(catId)) {
-        return ApiResponse.errorResponse(res, 400, 'Invalid categoryId');
-      }
+      if (!isValidObjectId(catId)) return ApiResponse.errorResponse(res, 400, 'Invalid categoryId');
       filter.categoryId = new mongoose.Types.ObjectId(catId);
       useTitleSearch = false;
     }
 
     if (subCatId) {
-      if (!isValidObjectId(subCatId)) {
+      if (!isValidObjectId(subCatId))
         return ApiResponse.errorResponse(res, 400, 'Invalid subCategoryId');
-      }
       filter.subCategoryId = new mongoose.Types.ObjectId(subCatId);
       useTitleSearch = false;
     }
@@ -310,30 +479,57 @@ export const searchProductsController = async (req, res) => {
         );
       }
 
-      const words = title.trim().split(/\s+/);
+      // ✅ Strip punctuation/special chars, filter empty tokens, escape safely
+      const words = title
+        .trim()
+        .split(/\s+/)
+        .map(w => w.replace(/[^a-zA-Z0-9]/g, '')) // remove -, ., etc.
+        .filter(w => w.length > 1) // drop single chars & empty
+        .map(escapeRegex);
 
-      // Strong: all words must match as whole words
+      if (words.length === 0) {
+        return ApiResponse.errorResponse(res, 400, 'Search title contains no valid keywords');
+      }
+
+      // Strong: ALL meaningful words must appear (whole-word boundary)
       const strongFilter = {
         ...filter,
-        $and: words.map(w => ({ title: { $regex: `\\b${w}\\b`, $options: 'i' } })),
+        $and: words.map(w => ({
+          title: { $regex: `\\b${w}\\b`, $options: 'i' },
+        })),
       };
 
-      // Weak: any word matches as substring
+      // Medium: ALL words as substrings (no boundary — catches partial matches)
+      const mediumFilter = {
+        ...filter,
+        $and: words.map(w => ({
+          title: { $regex: w, $options: 'i' },
+        })),
+      };
+
+      // Weak: ANY word matches as substring (broadest fallback)
       const weakFilter = {
         ...filter,
-        $or: words.map(w => ({ title: { $regex: w, $options: 'i' } })),
+        $or: words.map(w => ({
+          title: { $regex: w, $options: 'i' },
+        })),
       };
 
       let products = await fetchProducts(strongFilter, sortObj);
       let total = await productSchema.countDocuments(strongFilter);
 
-      // Fallback to weak filter
+      // Fallback 1 → medium
+      if (products.length === 0) {
+        products = await fetchProducts(mediumFilter, sortObj);
+        total = await productSchema.countDocuments(mediumFilter);
+      }
+
+      // Fallback 2 → weak
       if (products.length === 0) {
         products = await fetchProducts(weakFilter, sortObj);
         total = await productSchema.countDocuments(weakFilter);
       }
 
-      // In-memory price sort (because budget is a String in the schema)
       if (isPriceSort) products = sortByBudget(products, sort);
 
       return ApiResponse.successResponse(res, 200, 'Products fetched successfully', {
@@ -367,7 +563,6 @@ export const searchProductsController = async (req, res) => {
     return ApiResponse.errorResponse(res, 500, 'Internal server error');
   }
 };
-
 export const getProductById = async (req, res) => {
   try {
     const { productId } = req.params;

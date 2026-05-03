@@ -6,10 +6,12 @@ import cookieParser from 'cookie-parser';
 import dns from 'dns';
 import helmet from 'helmet';
 import morganMiddleware from './config/logger.js';
+import http from 'node:http';
+import { initSocket } from './config/socket.js';
 dns.setServers(['1.1.1.1', '8.8.8.8']);
-
 const app = express();
-
+const server = http.createServer(app);
+initSocket(server);
 app.use(
   cors({
     origin: [
@@ -47,4 +49,4 @@ app.get('/health', (req, res) => {
   res.end('ok');
 });
 
-export default app;
+export default server;
