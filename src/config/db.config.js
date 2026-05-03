@@ -11,8 +11,18 @@ export default function mongoCtx() {
       maxPoolSize: 10,
     })
     .then(() => {
-      console.log('Connected DB:', mongoose.connection.name);
-      console.log('Mongo Host:', mongoose.connection.host);
+      console.log(
+        JSON.stringify(
+          {
+            'Connected DB': mongoose.connection.name,
+            'Mongo Host': mongoose.connection.host,
+            'Mongo URI': mongoose.connection._connectionString,
+          },
+          null,
+          2
+        )
+      );
+
       console.log('Connected to MongoDB 🚀');
     })
     .catch(error => {

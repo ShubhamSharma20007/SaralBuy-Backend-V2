@@ -13,7 +13,7 @@ const auth = (req, res, next) => {
       ...decoded,
       userId: decoded.userId || decoded._id,
     };
-    console.log('auth middleware req.user:', req.user);
+    // console.log('auth middleware req.user:', req.user);
     next();
   } catch (err) {
     ApiResponse.errorResponse(res, 401, 'Invalid token');

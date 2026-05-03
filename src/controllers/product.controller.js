@@ -54,6 +54,7 @@ export const addProduct = async (req, res) => {
       rateAService: body.rateAService,
       additionalDeliveryAndPackage: body.additionalDeliveryAndPackage,
       paymentAndDelivery: body.paymentAndDelivery,
+      bidActiveDuration: body.bidActiveDuration,
     });
 
     return ApiResponse.successResponse(res, 201, 'Product created successfully', product);
