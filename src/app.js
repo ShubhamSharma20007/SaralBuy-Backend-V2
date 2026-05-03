@@ -4,9 +4,10 @@ import router from './routes/index.js';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dns from 'dns';
+import helmet from 'helmet';
+import morganMiddleware from './config/logger.js';
 dns.setServers(['1.1.1.1', '8.8.8.8']);
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
+
 const app = express();
 
 app.use(
@@ -25,9 +26,11 @@ app.use(
   })
 );
 
+app.use(helmet());
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(morganMiddleware);
 app.use('/api/v1', router);
 
 app.use((err, req, res, next) => {
@@ -39,6 +42,7 @@ app.use((err, req, res, next) => {
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 });
+
 app.get('/health', (req, res) => {
   res.end('ok');
 });

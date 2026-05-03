@@ -7,7 +7,6 @@ const PORT = process.env.PORT || 8000;
 const startServer = async () => {
   try {
     await mongoCtx();
-
     app.listen(PORT, () => {
       console.log(`Server is listening on ${PORT}`);
     });

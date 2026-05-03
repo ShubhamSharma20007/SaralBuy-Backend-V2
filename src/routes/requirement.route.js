@@ -6,7 +6,7 @@ import {
   getApprovedPendingRequirements,
   getCompletedApprovedRequirements,
 } from '../controllers/requirement.controller.js';
-import auth from '../middleware/auth.js';
+import auth from '../middleware/auth.middleware.js';
 const router = express.Router();
 
 router.get('/recent-requirements', getRecentRequirements);
