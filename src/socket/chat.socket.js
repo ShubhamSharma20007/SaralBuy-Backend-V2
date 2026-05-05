@@ -40,7 +40,7 @@ const chatSocket = (io, socket) => {
         .populate('sellerId', 'firstName lastName profileImage')
         .populate('productId', 'title') // ✅ Fix: populate productId with title field
         .lean();
-      console.log(chats)
+      console.log(chats);
       const shaped = await Promise.all(
         chats.map(async chat => {
           const isBuyer = chat.buyerId._id.toString() === userId;
@@ -72,80 +72,80 @@ const chatSocket = (io, socket) => {
   });
 
   //  Join a chat room ───────────────────────────────────────
-// Join a chat room ───────────────────────────────────────
-socket.on(SOCKET_EVENTS.JOIN_ROOM, async ({ roomId, buyerId, sellerId, productId }) => {
-  socket.join(roomId);
+  // Join a chat room ───────────────────────────────────────
+  socket.on(SOCKET_EVENTS.JOIN_ROOM, async ({ roomId, buyerId, sellerId, productId }) => {
+    socket.join(roomId);
 
-  if (buyerId && sellerId && productId) {
-    await chatSchema.findOneAndUpdate(
-      { roomId },
-      {
-        $setOnInsert: {
-          roomId,
-          buyerId: new mongoose.Types.ObjectId(buyerId),
-          sellerId: new mongoose.Types.ObjectId(sellerId),
-          productId: new mongoose.Types.ObjectId(productId),
-          messages: [],
-          buyerUnreadCount: 0,
-          sellerUnreadCount: 0,
-          lastMessage: null,
+    if (buyerId && sellerId && productId) {
+      await chatSchema.findOneAndUpdate(
+        { roomId },
+        {
+          $setOnInsert: {
+            roomId,
+            buyerId: new mongoose.Types.ObjectId(buyerId),
+            sellerId: new mongoose.Types.ObjectId(sellerId),
+            productId: new mongoose.Types.ObjectId(productId),
+            messages: [],
+            buyerUnreadCount: 0,
+            sellerUnreadCount: 0,
+            lastMessage: null,
+          },
         },
-      },
-      { upsert: true, new: true }
-    );
-  }
-
-  const chat = await chatSchema.findOne({ roomId }).lean();
-  if (chat) {
-    socket.emit(SOCKET_EVENTS.RECEIVE_MESSAGE, { roomId, messages: chat.messages });
-  }
-
-  // ✅ Check for ANY deal on this room and restore state for both buyer and seller
-  const latestDeal = await closeDealSchema
-    .findOne({ roomId })
-    .sort({ createdAt: -1 }) // get the most recent deal
-    .lean();
-
-  if (latestDeal) {
-    const isSeller = chat && chat.sellerId.toString() === userId.toString();
-    const isBuyer  = chat && chat.buyerId.toString()  === userId.toString();
-
-    // ✅ Seller: show approval popup if deal is still pending their response
-    if (isSeller && latestDeal.closedDealStatus === 'waiting_seller_approval') {
-      socket.emit(SOCKET_EVENTS.PENDING_DEAL, {
-        dealId:   latestDeal._id.toString(),
-        amount:   latestDeal.amount,
-        roomId:   latestDeal.roomId,
-        buyerId:  latestDeal.buyerId.toString(),
-        sellerId: latestDeal.sellerId.toString(),
-      });
+        { upsert: true, new: true }
+      );
     }
 
-    // ✅ Both buyer AND seller: restore final status on refresh
-    if (
-      latestDeal.closedDealStatus === 'completed' ||
-      latestDeal.closedDealStatus === 'rejected'
-    ) {
-      socket.emit(SOCKET_EVENTS.DEAL_STATUS_UPDATE, {
-        roomId,
-        dealId:     latestDeal._id.toString(),
-        status:     latestDeal.closedDealStatus, // 'completed' | 'rejected'
-        dealStatus: latestDeal.dealStatus,        // 'accepted'  | 'rejected'
-        amount:     latestDeal.amount,
-      });
+    const chat = await chatSchema.findOne({ roomId }).lean();
+    if (chat) {
+      socket.emit(SOCKET_EVENTS.RECEIVE_MESSAGE, { roomId, messages: chat.messages });
     }
 
-    // ✅ Buyer: restore "waiting" state (deal sent, seller hasn't responded yet)
-    if (isBuyer && latestDeal.closedDealStatus === 'waiting_seller_approval') {
-      socket.emit(SOCKET_EVENTS.DEAL_STATUS_UPDATE, {
-        roomId,
-        dealId: latestDeal._id.toString(),
-        status: 'waiting_seller_approval',
-        amount: latestDeal.amount,
-      });
+    // ✅ Check for ANY deal on this room and restore state for both buyer and seller
+    const latestDeal = await closeDealSchema
+      .findOne({ roomId })
+      .sort({ createdAt: -1 }) // get the most recent deal
+      .lean();
+
+    if (latestDeal) {
+      const isSeller = chat && chat.sellerId.toString() === userId.toString();
+      const isBuyer = chat && chat.buyerId.toString() === userId.toString();
+
+      // ✅ Seller: show approval popup if deal is still pending their response
+      if (isSeller && latestDeal.closedDealStatus === 'waiting_seller_approval') {
+        socket.emit(SOCKET_EVENTS.PENDING_DEAL, {
+          dealId: latestDeal._id.toString(),
+          amount: latestDeal.amount,
+          roomId: latestDeal.roomId,
+          buyerId: latestDeal.buyerId.toString(),
+          sellerId: latestDeal.sellerId.toString(),
+        });
+      }
+
+      // ✅ Both buyer AND seller: restore final status on refresh
+      if (
+        latestDeal.closedDealStatus === 'completed' ||
+        latestDeal.closedDealStatus === 'rejected'
+      ) {
+        socket.emit(SOCKET_EVENTS.DEAL_STATUS_UPDATE, {
+          roomId,
+          dealId: latestDeal._id.toString(),
+          status: latestDeal.closedDealStatus, // 'completed' | 'rejected'
+          dealStatus: latestDeal.dealStatus, // 'accepted'  | 'rejected'
+          amount: latestDeal.amount,
+        });
+      }
+
+      // ✅ Buyer: restore "waiting" state (deal sent, seller hasn't responded yet)
+      if (isBuyer && latestDeal.closedDealStatus === 'waiting_seller_approval') {
+        socket.emit(SOCKET_EVENTS.DEAL_STATUS_UPDATE, {
+          roomId,
+          dealId: latestDeal._id.toString(),
+          status: 'waiting_seller_approval',
+          amount: latestDeal.amount,
+        });
+      }
     }
-  }
-});
+  });
   //  Send message ───────────────────────────────────────────
   socket.on(SOCKET_EVENTS.SEND_MESSAGE, async ({ roomId, message, senderType, attachment }) => {
     try {

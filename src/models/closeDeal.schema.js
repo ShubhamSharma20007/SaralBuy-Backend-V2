@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const closedDealSchema = new mongoose.Schema(
   {
-      roomId: {          
+    roomId: {
       type: String,
       required: true,
     },
@@ -23,7 +23,7 @@ const closedDealSchema = new mongoose.Schema(
     },
     yourBudget: { type: Number, required: true },
     date: { type: Date, default: Date.now }, // Date of deal closure
-    amount: { type: Number, required: true }, 
+    amount: { type: Number, required: true },
     closedAt: { type: Date, default: Date.now },
     initiator: { type: String, default: 'buyer' },
     closedDealStatus: {

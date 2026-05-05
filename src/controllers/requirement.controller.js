@@ -477,15 +477,13 @@ export const getRequirementById = async (req, res) => {
   }
 };
 
-
 export const getRequirementAwarded = async (req, res) => {
   try {
     const userId = req.user?.userId;
 
     if (!userId) {
-      return ApiResponse.errorResponse(res, 400, "User not authenticated");
+      return ApiResponse.errorResponse(res, 400, 'User not authenticated');
     }
-
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -493,25 +491,24 @@ export const getRequirementAwarded = async (req, res) => {
 
     const closedDeals = await closeDealSchema
       .find({
-        closedDealStatus: "completed",
-        dealStatus: "accepted",
+        closedDealStatus: 'completed',
+        dealStatus: 'accepted',
       })
       .populate({
-        path: "productId",
-        match: { userId: userId }, 
+        path: 'productId',
+        match: { userId: userId },
         populate: {
-          path: "categoryId",
-          select: "-subCategories",
+          path: 'categoryId',
+          select: '-subCategories',
         },
       })
-      .populate("sellerId", "-password -__v")
+      .populate('sellerId', '-password -__v')
       .sort({ createdAt: -1 })
       .lean();
 
-    const filteredDeals = closedDeals.filter((deal) => deal.productId);
+    const filteredDeals = closedDeals.filter(deal => deal.productId);
 
-    
-    const cleanProduct = (prod) => {
+    const cleanProduct = prod => {
       if (!prod) return prod;
       const p = { ...prod };
       if (p.userId?._id) p.userId = p.userId._id.toString();
@@ -519,8 +516,7 @@ export const getRequirementAwarded = async (req, res) => {
       return p;
     };
 
-
-    const formattedDeals = filteredDeals.map((deal) => ({
+    const formattedDeals = filteredDeals.map(deal => ({
       _id: deal._id,
       product: cleanProduct(deal.productId),
       seller: deal.sellerId,
@@ -537,24 +533,19 @@ export const getRequirementAwarded = async (req, res) => {
     const total = formattedDeals.length;
     const paginatedData = formattedDeals.slice(skip, skip + limit);
 
-    return ApiResponse.successResponse(
-      res,
-      200,
-      "Awarded requirements fetched successfully",
-      {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-        data: paginatedData,
-      }
-    );
+    return ApiResponse.successResponse(res, 200, 'Awarded requirements fetched successfully', {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      data: paginatedData,
+    });
   } catch (err) {
     console.error(err);
     return ApiResponse.errorResponse(
       res,
       500,
-      err.message || "Failed to fetch awarded requirements"
+      err.message || 'Failed to fetch awarded requirements'
     );
   }
 };
@@ -564,30 +555,30 @@ export const getDealAwarded = async (req, res) => {
     const userId = req.user?.userId;
 
     if (!userId) {
-      return ApiResponse.errorResponse(res, 400, "User not authenticated");
+      return ApiResponse.errorResponse(res, 400, 'User not authenticated');
     }
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-
-    const closedDeals = await closeDealSchema.find({
-      sellerId: userId,
-      closedDealStatus: "completed",
-      dealStatus: "accepted"
-    })
-      .populate({
-        path: "productId",
-        populate: { path: "categoryId", select: "-subCategories" }
+    const closedDeals = await closeDealSchema
+      .find({
+        sellerId: userId,
+        closedDealStatus: 'completed',
+        dealStatus: 'accepted',
       })
-      .populate("buyerId", "-password -__v")
-      .populate("sellerId", "-password -__v")
+      .populate({
+        path: 'productId',
+        populate: { path: 'categoryId', select: '-subCategories' },
+      })
+      .populate('buyerId', '-password -__v')
+      .populate('sellerId', '-password -__v')
       .sort({ createdAt: -1 })
       .lean();
 
     // ✅ Helper to clean product
-    const cleanProduct = (prod) => {
+    const cleanProduct = prod => {
       if (!prod) return prod;
       const p = { ...prod };
       if (p.userId?._id) p.userId = p.userId._id.toString();
@@ -596,8 +587,7 @@ export const getDealAwarded = async (req, res) => {
       return p;
     };
 
-
-    const formattedDeals = closedDeals.map((deal) => ({
+    const formattedDeals = closedDeals.map(deal => ({
       _id: deal._id,
       product: cleanProduct(deal.productId),
       buyer: deal.buyerId,
@@ -609,31 +599,25 @@ export const getDealAwarded = async (req, res) => {
       closedDealStatus: deal.closedDealStatus,
       createdAt: deal.createdAt,
       updatedAt: deal.updatedAt,
-      closedAt: deal.closedAt
+      closedAt: deal.closedAt,
     }));
-
 
     const total = formattedDeals.length;
     const paginatedDeals = formattedDeals.slice(skip, skip + limit);
 
-    return ApiResponse.successResponse(
-      res,
-      200,
-      "Seller awarded deals fetched successfully",
-      {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-        data: paginatedDeals,
-      }
-    );
+    return ApiResponse.successResponse(res, 200, 'Seller awarded deals fetched successfully', {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      data: paginatedDeals,
+    });
   } catch (err) {
     console.error(err);
     return ApiResponse.errorResponse(
       res,
       500,
-      err.message || "Failed to fetch seller awarded deals"
+      err.message || 'Failed to fetch seller awarded deals'
     );
   }
 };
