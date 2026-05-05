@@ -3,9 +3,11 @@ import {
   getRecentRequirements,
   createRequirement,
   getBuyerRequirements,
-  getApprovedPendingRequirements,
-  getCompletedApprovedRequirements,
+  // getApprovedPendingRequirements,
+  // getCompletedApprovedRequirements,
   getRequirementById,
+  getRequirementAwarded,
+  getDealAwarded
 } from '../controllers/requirement.controller.js';
 import auth from '../middleware/auth.middleware.js';
 const router = express.Router();
@@ -13,7 +15,16 @@ const router = express.Router();
 router.get('/recent-requirements', getRecentRequirements);
 router.post('/create', auth, createRequirement);
 router.get('/my-requirements', auth, getBuyerRequirements);
-router.get('/approved-pending', auth, getApprovedPendingRequirements);
-router.get('/completed-approved', auth, getCompletedApprovedRequirements);
+
 router.get('/get-requirement/:id', auth, getRequirementById);
+router.get(
+  "/requirement-awarded",
+  auth,
+  getRequirementAwarded
+);
+router.get(
+  "/deal-awarded",
+  auth,
+  getDealAwarded
+);
 export default router;

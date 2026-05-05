@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import { ApiResponse } from '../helpers/ApiReponse.js';
 import requirementSchema from '../models/requirement.schema.js';
 import productSchema from '../models/product.schema.js';
-import approveRequirementSchema from '../models/approveRequirement.schema.js';
 import closeDealSchema from '../models/closeDeal.schema.js';
 
 export const getRecentRequirements = async (req, res) => {
@@ -196,208 +195,208 @@ export const getBuyerRequirements = async (req, res) => {
   }
 };
 
-export const getApprovedPendingRequirements = async (req, res) => {
-  try {
-    const sellerId = req.user?.userId;
+// export const getApprovedPendingRequirements = async (req, res) => {
+//   try {
+//     const sellerId = req.user?.userId;
 
-    if (!sellerId) {
-      return ApiResponse.errorResponse(res, 400, 'User not authenticated');
-    }
+//     if (!sellerId) {
+//       return ApiResponse.errorResponse(res, 400, 'User not authenticated');
+//     }
 
-    // ✅ Pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+//     // ✅ Pagination
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 10;
+//     const skip = (page - 1) * limit;
 
-    // ✅ Fetch approved requirements
-    const approvedRequirements = await approveRequirementSchema
-      .find({
-        'sellerDetails.sellerId': sellerId,
-      })
-      .populate({
-        path: 'productId',
-        populate: { path: 'categoryId', select: '-subCategories' },
-      })
-      .populate({
-        path: 'sellerDetails.sellerId',
-        select: '-password -__v',
-      })
-      .lean();
+//     // ✅ Fetch approved requirements
+//     const approvedRequirements = await approveRequirementSchema
+//       .find({
+//         'sellerDetails.sellerId': sellerId,
+//       })
+//       .populate({
+//         path: 'productId',
+//         populate: { path: 'categoryId', select: '-subCategories' },
+//       })
+//       .populate({
+//         path: 'sellerDetails.sellerId',
+//         select: '-password -__v',
+//       })
+//       .lean();
 
-    // ✅ Get productIds
-    const productIds = approvedRequirements.map(ar => ar.productId?._id).filter(Boolean);
+//     // ✅ Get productIds
+//     const productIds = approvedRequirements.map(ar => ar.productId?._id).filter(Boolean);
 
-    // ✅ Get closed deals
-    const closedDeals = await closeDealSchema
-      .find({
-        sellerId,
-        productId: { $in: productIds },
-      })
-      .select('productId dealStatus closedDealStatus finalBudget buyerId')
-      .lean();
+//     // ✅ Get closed deals
+//     const closedDeals = await closeDealSchema
+//       .find({
+//         sellerId,
+//         productId: { $in: productIds },
+//       })
+//       .select('productId dealStatus closedDealStatus finalBudget buyerId')
+//       .lean();
 
-    // ✅ Create deal map
-    const dealMap = {};
-    closedDeals.forEach(deal => {
-      const key = `${deal.productId.toString()}_${deal.buyerId.toString()}`;
-      dealMap[key] = deal;
-    });
+//     // ✅ Create deal map
+//     const dealMap = {};
+//     closedDeals.forEach(deal => {
+//       const key = `${deal.productId.toString()}_${deal.buyerId.toString()}`;
+//       dealMap[key] = deal;
+//     });
 
-    // ✅ Clean product
-    const cleanProduct = prod => {
-      if (!prod) return null;
+//     // ✅ Clean product
+//     const cleanProduct = prod => {
+//       if (!prod) return null;
 
-      const p = { ...prod };
+//       const p = { ...prod };
 
-      if (p.userId?._id) p.userId = p.userId._id.toString();
-      if (p.subCategoryId?._id) p.subCategoryId = p.subCategoryId._id;
+//       if (p.userId?._id) p.userId = p.userId._id.toString();
+//       if (p.subCategoryId?._id) p.subCategoryId = p.subCategoryId._id;
 
-      delete p.__v;
+//       delete p.__v;
 
-      return {
-        ...p,
-        subProducts: [], // keep consistent
-      };
-    };
+//       return {
+//         ...p,
+//         subProducts: [], // keep consistent
+//       };
+//     };
 
-    // ✅ Process data (NO multi-product)
-    const enhancedRequirements = approvedRequirements.map(ar => {
-      const product = cleanProduct(ar.productId);
+//     // ✅ Process data (NO multi-product)
+//     const enhancedRequirements = approvedRequirements.map(ar => {
+//       const product = cleanProduct(ar.productId);
 
-      const dealKey =
-        product && ar.buyerId ? `${product._id.toString()}_${ar.buyerId.toString()}` : null;
+//       const dealKey =
+//         product && ar.buyerId ? `${product._id.toString()}_${ar.buyerId.toString()}` : null;
 
-      const matchedDeal = dealKey ? dealMap[dealKey] : null;
+//       const matchedDeal = dealKey ? dealMap[dealKey] : null;
 
-      return {
-        _id: ar._id,
-        createdAt: ar.createdAt,
-        updatedAt: ar.updatedAt,
-        product,
-        buyer: ar.buyerId,
-        sellerDetails: ar.sellerDetails,
-        productCategory: ar.productCategory,
-        minBudget: ar.minBudget,
-        budget: ar.budget,
-        date: ar.date,
+//       return {
+//         _id: ar._id,
+//         createdAt: ar.createdAt,
+//         updatedAt: ar.updatedAt,
+//         product,
+//         buyer: ar.buyerId,
+//         sellerDetails: ar.sellerDetails,
+//         productCategory: ar.productCategory,
+//         minBudget: ar.minBudget,
+//         budget: ar.budget,
+//         date: ar.date,
 
-        // ✅ deal info
-        dealStatus: matchedDeal?.dealStatus || 'pending',
-        closedDealStatus: matchedDeal?.closedDealStatus || null,
-        finalBudget: matchedDeal?.finalBudget || null,
-      };
-    });
+//         // ✅ deal info
+//         dealStatus: matchedDeal?.dealStatus || 'pending',
+//         closedDealStatus: matchedDeal?.closedDealStatus || null,
+//         finalBudget: matchedDeal?.finalBudget || null,
+//       };
+//     });
 
-    // ✅ Filter statuses
-    const filteredRequirements = enhancedRequirements.filter(item =>
-      ['waiting_seller_approval', 'pending', 'rejected', 'completed'].includes(
-        item?.closedDealStatus
-      )
-    );
+//     // ✅ Filter statuses
+//     const filteredRequirements = enhancedRequirements.filter(item =>
+//       ['waiting_seller_approval', 'pending', 'rejected', 'completed'].includes(
+//         item?.closedDealStatus
+//       )
+//     );
 
-    // ✅ Pagination (after filter)
-    const total = filteredRequirements.length;
-    const paginatedRequirements = filteredRequirements.slice(skip, skip + limit);
+//     // ✅ Pagination (after filter)
+//     const total = filteredRequirements.length;
+//     const paginatedRequirements = filteredRequirements.slice(skip, skip + limit);
 
-    return ApiResponse.successResponse(res, 200, 'Approved requirements fetched successfully', {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-      data: paginatedRequirements,
-    });
-  } catch (err) {
-    console.error(err);
-    return ApiResponse.errorResponse(
-      res,
-      500,
-      err.message || 'Failed to fetch approved requirements'
-    );
-  }
-};
+//     return ApiResponse.successResponse(res, 200, 'Approved requirements fetched successfully', {
+//       total,
+//       page,
+//       limit,
+//       totalPages: Math.ceil(total / limit),
+//       data: paginatedRequirements,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     return ApiResponse.errorResponse(
+//       res,
+//       500,
+//       err.message || 'Failed to fetch approved requirements'
+//     );
+//   }
+// };
 
-export const getCompletedApprovedRequirements = async (req, res) => {
-  try {
-    const userId = req.user?.userId;
+// export const getCompletedApprovedRequirements = async (req, res) => {
+//   try {
+//     const userId = req.user?.userId;
 
-    if (!userId) {
-      return ApiResponse.errorResponse(res, 400, 'User not authenticated');
-    }
+//     if (!userId) {
+//       return ApiResponse.errorResponse(res, 400, 'User not authenticated');
+//     }
 
-    // ✅ Pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+//     // ✅ Pagination
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 10;
+//     const skip = (page - 1) * limit;
 
-    // ✅ Fetch closed deals
-    const [closedDeals, total] = await Promise.all([
-      closeDealSchema
-        .find({ buyerId: userId }) // or $or if needed
-        .populate({
-          path: 'productId',
-          populate: { path: 'categoryId', select: '-subCategories' },
-        })
-        .populate('buyerId')
-        .populate({
-          path: 'sellerId',
-          select: '-password -__v',
-        })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+//     // ✅ Fetch closed deals
+//     const [closedDeals, total] = await Promise.all([
+//       closeDealSchema
+//         .find({ buyerId: userId }) // or $or if needed
+//         .populate({
+//           path: 'productId',
+//           populate: { path: 'categoryId', select: '-subCategories' },
+//         })
+//         .populate('buyerId')
+//         .populate({
+//           path: 'sellerId',
+//           select: '-password -__v',
+//         })
+//         .sort({ createdAt: -1 })
+//         .skip(skip)
+//         .limit(limit)
+//         .lean(),
 
-      closeDealSchema.countDocuments({ buyerId: userId }),
-    ]);
+//       closeDealSchema.countDocuments({ buyerId: userId }),
+//     ]);
 
-    // ✅ Clean product
-    const cleanProduct = prod => {
-      if (!prod) return null;
+//     // ✅ Clean product
+//     const cleanProduct = prod => {
+//       if (!prod) return null;
 
-      const p = { ...prod };
+//       const p = { ...prod };
 
-      if (p.userId?._id) p.userId = p.userId._id.toString();
-      if (p.subCategoryId?._id) p.subCategoryId = p.subCategoryId._id;
+//       if (p.userId?._id) p.userId = p.userId._id.toString();
+//       if (p.subCategoryId?._id) p.subCategoryId = p.subCategoryId._id;
 
-      delete p.__v;
+//       delete p.__v;
 
-      return {
-        ...p,
-        subProducts: [], // keep consistent structure
-      };
-    };
+//       return {
+//         ...p,
+//         subProducts: [], // keep consistent structure
+//       };
+//     };
 
-    // ✅ Map response (NO multi-product)
-    const result = closedDeals.map(deal => ({
-      _id: deal._id,
-      createdAt: deal.createdAt,
-      updatedAt: deal.updatedAt,
-      product: cleanProduct(deal.productId),
-      buyer: deal.buyerId,
-      seller: deal.sellerId,
-      budgetAmount: deal.budgetAmount,
-      date: deal.date,
-      finalBudget: deal.finalBudget || 0,
-      closedAt: deal.closedAt,
-      closedDealStatus: deal.closedDealStatus,
-    }));
+//     // ✅ Map response (NO multi-product)
+//     const result = closedDeals.map(deal => ({
+//       _id: deal._id,
+//       createdAt: deal.createdAt,
+//       updatedAt: deal.updatedAt,
+//       product: cleanProduct(deal.productId),
+//       buyer: deal.buyerId,
+//       seller: deal.sellerId,
+//       budgetAmount: deal.budgetAmount,
+//       date: deal.date,
+//       finalBudget: deal.finalBudget || 0,
+//       closedAt: deal.closedAt,
+//       closedDealStatus: deal.closedDealStatus,
+//     }));
 
-    return ApiResponse.successResponse(res, 200, 'Completed closed deals fetched successfully', {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-      data: result,
-    });
-  } catch (err) {
-    console.error(err);
-    return ApiResponse.errorResponse(
-      res,
-      500,
-      err.message || 'Failed to fetch completed closed deals'
-    );
-  }
-};
+//     return ApiResponse.successResponse(res, 200, 'Completed closed deals fetched successfully', {
+//       total,
+//       page,
+//       limit,
+//       totalPages: Math.ceil(total / limit),
+//       data: result,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     return ApiResponse.errorResponse(
+//       res,
+//       500,
+//       err.message || 'Failed to fetch completed closed deals'
+//     );
+//   }
+// };
 
 export const getRequirementById = async (req, res) => {
   try {
@@ -475,5 +474,166 @@ export const getRequirementById = async (req, res) => {
   } catch (err) {
     console.error(err);
     return ApiResponse.errorResponse(res, 500, err.message || 'Failed to fetch requirement');
+  }
+};
+
+
+export const getRequirementAwarded = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return ApiResponse.errorResponse(res, 400, "User not authenticated");
+    }
+
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const closedDeals = await closeDealSchema
+      .find({
+        closedDealStatus: "completed",
+        dealStatus: "accepted",
+      })
+      .populate({
+        path: "productId",
+        match: { userId: userId }, 
+        populate: {
+          path: "categoryId",
+          select: "-subCategories",
+        },
+      })
+      .populate("sellerId", "-password -__v")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const filteredDeals = closedDeals.filter((deal) => deal.productId);
+
+    
+    const cleanProduct = (prod) => {
+      if (!prod) return prod;
+      const p = { ...prod };
+      if (p.userId?._id) p.userId = p.userId._id.toString();
+      delete p.__v;
+      return p;
+    };
+
+
+    const formattedDeals = filteredDeals.map((deal) => ({
+      _id: deal._id,
+      product: cleanProduct(deal.productId),
+      seller: deal.sellerId,
+      yourBudget: deal.yourBudget,
+      amount: deal.amount,
+      finalBudget: deal.finalBudget,
+      dealStatus: deal.dealStatus,
+      closedDealStatus: deal.closedDealStatus,
+      createdAt: deal.createdAt,
+      updatedAt: deal.updatedAt,
+      closedAt: deal.closedAt,
+    }));
+
+    const total = formattedDeals.length;
+    const paginatedData = formattedDeals.slice(skip, skip + limit);
+
+    return ApiResponse.successResponse(
+      res,
+      200,
+      "Awarded requirements fetched successfully",
+      {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        data: paginatedData,
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    return ApiResponse.errorResponse(
+      res,
+      500,
+      err.message || "Failed to fetch awarded requirements"
+    );
+  }
+};
+
+export const getDealAwarded = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return ApiResponse.errorResponse(res, 400, "User not authenticated");
+    }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+
+    const closedDeals = await closeDealSchema.find({
+      sellerId: userId,
+      closedDealStatus: "completed",
+      dealStatus: "accepted"
+    })
+      .populate({
+        path: "productId",
+        populate: { path: "categoryId", select: "-subCategories" }
+      })
+      .populate("buyerId", "-password -__v")
+      .populate("sellerId", "-password -__v")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // ✅ Helper to clean product
+    const cleanProduct = (prod) => {
+      if (!prod) return prod;
+      const p = { ...prod };
+      if (p.userId?._id) p.userId = p.userId._id.toString();
+      if (p.subCategoryId?._id) p.subCategoryId = p.subCategoryId._id;
+      delete p.__v;
+      return p;
+    };
+
+
+    const formattedDeals = closedDeals.map((deal) => ({
+      _id: deal._id,
+      product: cleanProduct(deal.productId),
+      buyer: deal.buyerId,
+      seller: deal.sellerId,
+      yourBudget: deal.yourBudget,
+      amount: deal.amount,
+      finalBudget: deal.finalBudget,
+      dealStatus: deal.dealStatus,
+      closedDealStatus: deal.closedDealStatus,
+      createdAt: deal.createdAt,
+      updatedAt: deal.updatedAt,
+      closedAt: deal.closedAt
+    }));
+
+
+    const total = formattedDeals.length;
+    const paginatedDeals = formattedDeals.slice(skip, skip + limit);
+
+    return ApiResponse.successResponse(
+      res,
+      200,
+      "Seller awarded deals fetched successfully",
+      {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        data: paginatedDeals,
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    return ApiResponse.errorResponse(
+      res,
+      500,
+      err.message || "Failed to fetch seller awarded deals"
+    );
   }
 };

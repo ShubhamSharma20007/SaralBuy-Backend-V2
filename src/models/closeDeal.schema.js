@@ -2,6 +2,10 @@ import mongoose from 'mongoose';
 
 const closedDealSchema = new mongoose.Schema(
   {
+      roomId: {          
+      type: String,
+      required: true,
+    },
     productId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
@@ -19,7 +23,7 @@ const closedDealSchema = new mongoose.Schema(
     },
     yourBudget: { type: Number, required: true },
     date: { type: Date, default: Date.now }, // Date of deal closure
-    finalBudget: { type: Number },
+    amount: { type: Number, required: true }, 
     closedAt: { type: Date, default: Date.now },
     initiator: { type: String, default: 'buyer' },
     closedDealStatus: {

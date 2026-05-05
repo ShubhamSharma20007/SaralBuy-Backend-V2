@@ -63,6 +63,10 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isSoldProduct:{
+      type:Boolean,
+      default:false
+    }
   },
   {
     timestamps: true,
