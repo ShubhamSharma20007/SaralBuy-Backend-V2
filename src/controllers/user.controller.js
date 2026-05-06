@@ -246,7 +246,7 @@ export const updateProfile = async (req, res) => {
     if (businessName) updates.businessName = businessName;
 
     const user = await userSchema
-      .findByIdAndUpdate(req.user.userId, updates, { new: true })
+      .findByIdAndUpdate(req.user.userId, { $set: updates }, { new: true })
       .select('-password');
 
     return ApiResponse.successResponse(res, 200, 'user updated successfully', user);

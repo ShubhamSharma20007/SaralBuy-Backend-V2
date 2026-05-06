@@ -16,4 +16,5 @@ export const SOCKET_EVENTS = {
   DEAL_APPROVAL: 'chat:deal_approval',
   DEAL_STATUS_UPDATE: 'chat:deal_status_update',
   PENDING_DEAL: 'chat:pending_deal',
+  PRODUCT_SOLD: 'chat:product_sold',
 };

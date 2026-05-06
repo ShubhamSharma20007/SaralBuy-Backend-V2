@@ -38,9 +38,8 @@ const chatSocket = (io, socket) => {
         .sort({ updatedAt: -1 })
         .populate('buyerId', 'firstName lastName profileImage')
         .populate('sellerId', 'firstName lastName profileImage')
-        .populate('productId', 'title') // ✅ Fix: populate productId with title field
+        .populate('productId', 'title')
         .lean();
-      console.log(chats);
       const shaped = await Promise.all(
         chats.map(async chat => {
           const isBuyer = chat.buyerId._id.toString() === userId;
@@ -228,7 +227,7 @@ const chatSocket = (io, socket) => {
     try {
       const productBudget = await productSchema
         .findById(payload.productId)
-        .select('minimumBudget')
+        .select('minimumBudget isSoldProduct')
         .lean();
 
       const deal = await closeDealSchema.create({
@@ -307,6 +306,23 @@ const chatSocket = (io, socket) => {
       });
     } catch (err) {
       console.error('DEAL_APPROVAL error:', err);
+    }
+  });
+
+  // is Sold Product
+  socket.on(SOCKET_EVENTS.PRODUCT_SOLD, async data => {
+    const { productId, roomId } = data;
+    const product = await productSchema.findById(productId).lean();
+    if (product?.isSoldProduct) {
+      socket.emit(SOCKET_EVENTS.PRODUCT_SOLD, {
+        productId,
+        isSoldProduct: true,
+      });
+    } else {
+      socket.emit(SOCKET_EVENTS.PRODUCT_SOLD, {
+        productId,
+        isSoldProduct: false,
+      });
     }
   });
 

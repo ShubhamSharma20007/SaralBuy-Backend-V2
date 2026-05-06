@@ -217,6 +217,10 @@ export const createBid = async (req, res) => {
       throw new Error('budgetQuation is required');
     }
 
+    const isProductIsSold = await productSchema.exists({ _id: productId, isSoldProduct: true });
+    if (isProductIsSold?._id)
+      return ApiResponse.errorResponse(res, 400, 'This product is already sold');
+
     // ❌ Duplicate bid check
     const existingBid = await bidSchema.findOne({ sellerId, buyerId, productId }, null, {
       session,

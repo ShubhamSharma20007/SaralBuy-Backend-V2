@@ -191,6 +191,7 @@ export const getProductByName = async (req, res) => {
         {
           title: { $regex: productName, $options: 'i' },
           draft: false,
+          isSoldProduct: false,
         },
         {
           title: 1,
@@ -442,7 +443,7 @@ export const searchProductsController = async (req, res) => {
     };
 
     // ─── Base filter ──────────────────────────────────────────────────────────
-    let filter = { draft: false };
+    let filter = { draft: false, isSoldProduct: false };
     let useTitleSearch = true;
 
     const catId = category || categoryId;
@@ -826,7 +827,6 @@ export const saveAsDraft = async (req, res) => {
         productId = parsed?.[0]?._id;
       } catch (e) {}
     }
-    console.log(req.body);
 
     if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
       return ApiResponse.errorResponse(res, 400, 'Valid productId is required');

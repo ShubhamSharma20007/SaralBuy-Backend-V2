@@ -489,14 +489,14 @@ export const getRequirementAwarded = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const closedDeals = await closeDealSchema
+    let closedDeals = await closeDealSchema
       .find({
+        $or: [{ buyerId: userId }, { sellerId: userId }],
         closedDealStatus: 'completed',
         dealStatus: 'accepted',
       })
       .populate({
         path: 'productId',
-        match: { userId: userId },
         populate: {
           path: 'categoryId',
           select: '-subCategories',
@@ -506,6 +506,7 @@ export const getRequirementAwarded = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    closedDeals = closedDeals.filter(deal => deal.productId.userId == userId);
     const filteredDeals = closedDeals.filter(deal => deal.productId);
 
     const cleanProduct = prod => {
