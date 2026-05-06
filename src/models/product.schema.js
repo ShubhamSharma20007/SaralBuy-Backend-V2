@@ -7,6 +7,7 @@ const productSchema = new mongoose.Schema(
       required: function () {
         return this.draft === false;
       },
+      trim: true,
     },
     quantity: {
       type: String,

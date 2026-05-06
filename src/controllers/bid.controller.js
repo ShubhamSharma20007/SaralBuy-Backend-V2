@@ -448,7 +448,7 @@ export const getAllBids = async (req, res) => {
       },
       {
         $addFields: {
-          closeDealStatus: '$closedDeal.closedDealStatus',
+          closedDealStatus: '$closedDeal.closedDealStatus',
         },
       },
       {
