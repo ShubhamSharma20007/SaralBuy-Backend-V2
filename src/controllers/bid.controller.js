@@ -501,7 +501,7 @@ export const getAllBids = async (req, res) => {
 export const getBidById = async (req, res) => {
   try {
     const { id } = req.params;
-
+    let dealStatus = 'pending';
     if (!isValidObjectId(id)) {
       return ApiResponse.errorResponse(res, 400, 'Invalid bid id');
     }
@@ -575,7 +575,16 @@ export const getBidById = async (req, res) => {
       return p;
     };
 
-    const product = cleanProduct(productDoc);
+    const deal = await closeDealSchema
+      .findOne({ productId: productDoc._id })
+      .select('closedDealStatus')
+      .lean();
+
+    if (deal?.closedDealStatus) {
+      dealStatus = deal.closedDealStatus;
+    }
+
+    const product = { ...cleanProduct(productDoc), dealStatus };
 
     let buyer = null;
     if (product.userId) {
@@ -638,5 +647,43 @@ export const getBidByProductId = async (req, res) => {
     return ApiResponse.successResponse(res, 200, 'Bid fetched successfully', getBidDoc);
   } catch (error) {
     return ApiResponse.errorResponse(res, 400, error.message);
+  }
+};
+
+export const deleteBid = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sellerId = req.user.userId;
+    const bid = await bidSchema.findOne({ _id: id, sellerId });
+    if (!bid) {
+      return ApiResponse.errorResponse(res, 403, 'Not authorized to delete this bid');
+    }
+
+    try {
+      await requirementSchema.findOneAndUpdate(
+        { productId: bid.productId },
+        { $pull: { sellers: { sellerId: bid.sellerId || sellerId } } }
+      );
+    } catch (e) {
+      console.error('Failed to remove seller from requirement:', e.message || e);
+    }
+
+    await bidSchema.deleteOne({ _id: id });
+
+    try {
+      if (bid.productId) {
+        await productSchema.findByIdAndUpdate(bid.productId, { $inc: { totalBidCount: -1 } });
+      }
+    } catch (e) {
+      console.error('Failed to decrement product totalBidCount:', e.message || e);
+    }
+
+    return ApiResponse.successResponse(res, 200, 'Bid deleted successfully');
+  } catch (err) {
+    return ApiResponse.errorResponse(
+      res,
+      400,
+      err.message || 'Something went wrong while deleting bid'
+    );
   }
 };
