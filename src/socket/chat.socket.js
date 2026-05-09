@@ -131,6 +131,7 @@ const chatSocket = (io, socket) => {
           status: latestDeal.closedDealStatus, // 'completed' | 'rejected'
           dealStatus: latestDeal.dealStatus, // 'accepted'  | 'rejected'
           amount: latestDeal.amount,
+           sellerRating: latestDeal.sellerRating ?? 0,
         });
       }
 
@@ -295,15 +296,18 @@ const chatSocket = (io, socket) => {
         status: newClosedDealStatus,
         dealStatus: newDealStatus,
         amount: updatedDeal.amount,
+        sellerRating: updatedDeal.sellerRating ?? 0,  
       });
 
       // update the product is sold
-
-      await productSchema.findByIdAndUpdate(updatedDeal.productId, {
+      if(newClosedDealStatus === 'completed'){
+        await productSchema.findByIdAndUpdate(updatedDeal.productId, {
         $set: {
           isSoldProduct: true,
         },
       });
+      }
+      
     } catch (err) {
       console.error('DEAL_APPROVAL error:', err);
     }
@@ -325,6 +329,24 @@ const chatSocket = (io, socket) => {
       });
     }
   });
+
+  // Deal Rating
+socket.on(SOCKET_EVENTS.DEAL_RATING, async ({ dealId, rating }) => {
+  try {
+    if (!dealId || typeof rating !== 'number' || rating < 1 || rating > 5) return;
+
+    await closeDealSchema.findByIdAndUpdate(
+      dealId,
+      { $set: { sellerRating: rating } },
+      { new: true }
+    );
+
+    socket.emit(SOCKET_EVENTS.DEAL_RATING, { success: true });
+  } catch (err) {
+    console.error('DEAL_RATING error:', err);
+    socket.emit(SOCKET_EVENTS.DEAL_RATING, { success: false });
+  }
+});
 
   socket.on(SOCKET_EVENTS.DISCONNECT, () => {
     onlineUsers.delete(userId);

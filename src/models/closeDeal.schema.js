@@ -36,6 +36,12 @@ const closedDealSchema = new mongoose.Schema(
       enum: ['pending', 'accepted', 'rejected'],
       default: 'pending',
     },
+    sellerRating:{
+      type: Number,
+      max:5,
+      min:0,
+      default:0
+    }
   },
   { timestamps: true }
 );

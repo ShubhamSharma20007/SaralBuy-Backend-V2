@@ -581,13 +581,15 @@ export const getProductById = async (req, res) => {
 
     const getStatus = await closeDealSchema
       .findOne({ productId: productId })
-      .select('closedDealStatus')
+      .select('closedDealStatus sellerRating')
       .lean();
 
     const dealStatus = getStatus?.closedDealStatus || null;
+    const sellerRating = getStatus?.sellerRating ?? 0;
 
     const productObj = product.toObject();
     productObj.dealStatus = dealStatus;
+    productObj.sellerRating = sellerRating;
 
     return ApiResponse.successResponse(res, 200, 'Product found', [
       {
