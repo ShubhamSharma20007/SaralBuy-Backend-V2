@@ -11,6 +11,7 @@ export const initSocket = server => {
       credentials: true,
       methods: ['GET', 'POST', 'DELETE', 'PUT'],
     },
+    transports: ['websocket', 'polling'],
   });
 
   io.use((socket, next) => {
