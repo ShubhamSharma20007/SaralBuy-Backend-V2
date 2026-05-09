@@ -1,8 +1,6 @@
 import { ApiResponse } from '../helpers/ApiReponse.js';
-import productSchema from '../models/product.schema.js';
 import productNotificaitonSchema from '../models/productNotificaiton.schema.js';
 
-// Backend controller - update getNotifications function
 export const getNotifications = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -14,7 +12,6 @@ export const getNotifications = async (req, res) => {
 
     const skip = (page - 1) * limit;
 
-    // Get notifications where user is recipient
     const query = { recipientId: userId };
 
     const [notifications, total] = await Promise.all([
@@ -28,12 +25,14 @@ export const getNotifications = async (req, res) => {
       productNotificaitonSchema.countDocuments(query),
     ]);
 
+    const hasMore = skip + limit < total;
+
     return ApiResponse.successResponse(res, 200, 'Notifications fetched successfully', {
       notifications,
       total,
       page,
       limit,
-      hasMore: skip + limit < total,
+      hasMore,
     });
   } catch (error) {
     return ApiResponse.errorResponse(res, 500, error.message || 'Something went wrong');
