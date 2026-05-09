@@ -10,6 +10,7 @@ import http from 'node:http';
 import { initSocket } from './config/socket.js';
 dns.setServers(['1.1.1.1', '8.8.8.8']);
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 initSocket(server);
 app.use(
