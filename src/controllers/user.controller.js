@@ -166,10 +166,11 @@ export const verifyOtp = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
     res.cookie('authToken', token, {
-      sameSite: 'none',
+      sameSite: 'None',
       httpOnly: true,
       secure: true,
       path: '/',
+      partitioned: true,
     });
 
     return ApiResponse.successResponse(res, 200, 'OTP verified successfully', {
