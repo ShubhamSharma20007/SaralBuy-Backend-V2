@@ -5,6 +5,7 @@ import productRouter from './product.route.js';
 import bidRouter from './bid.route.js';
 import requirementRouter from './requirement.route.js';
 import cartRouter from './cart.route.js';
+import notificationRouter from './notification.route.js';
 const router = express.Router();
 
 // const adminRoutes =[
@@ -23,7 +24,7 @@ const routes = [
   { path: '/bid', router: bidRouter },
   { path: '/requirement', router: requirementRouter },
   { path: '/cart', router: cartRouter },
-  // {path:'/chat',router:chatRouter},
+  { path: '/notification', router: notificationRouter },
   // {path:"/banner",router:bannerRouter},
   // ...adminRoutes
 ];

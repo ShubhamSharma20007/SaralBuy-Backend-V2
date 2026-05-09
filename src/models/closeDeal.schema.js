@@ -36,14 +36,15 @@ const closedDealSchema = new mongoose.Schema(
       enum: ['pending', 'accepted', 'rejected'],
       default: 'pending',
     },
-    sellerRating:{
+    sellerRating: {
       type: Number,
-      max:5,
-      min:0,
-      default:0
-    }
+      max: 5,
+      min: 0,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
+closedDealSchema.index({ productId: 1, buyerId: 1, sellerId: 1 }, { unique: true });
 
 export default mongoose.model('ClosedDeal', closedDealSchema);

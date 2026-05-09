@@ -622,3 +622,16 @@ export const getDealAwarded = async (req, res) => {
     );
   }
 };
+
+export const getRequirementId = async (req, res) => {
+  const { productId } = req.params;
+  try {
+    const requirement = await requirementSchema.exists({ productId });
+    if (!requirement) {
+      return ApiResponse.errorResponse(res, 404, 'Requirement not found');
+    }
+    return ApiResponse.successResponse(res, 200, 'Requirement found', requirement?._id);
+  } catch (error) {
+    return ApiResponse.errorResponse(res, 500, 'Error fetching requirement', error);
+  }
+};

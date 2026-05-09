@@ -101,4 +101,6 @@ chatSchema.add({
   },
 });
 
+chatSchema.index({ productId: 1, buyerId: 1, sellerId: 1 }, { unique: true });
+
 export default mongoose.model('Chat', chatSchema);

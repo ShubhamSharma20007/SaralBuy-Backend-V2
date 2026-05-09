@@ -6,6 +6,10 @@ import productSchema from '../models/product.schema.js';
 import requirementSchema from '../models/requirement.schema.js';
 import cartSchema from '../models/cart.schema.js';
 import userSchema from '../models/user.schema.js';
+import { getIO } from '../config/socket.js';
+import { onlineUsers } from '../socket/onlineUsers.js';
+import { SOCKET_EVENTS } from '../socket/socketEvents.js';
+import productNotificaitonSchema from '../models/productNotificaiton.schema.js';
 
 export const getLatestThreeBidAndDraft = async (req, res) => {
   try {
@@ -350,6 +354,45 @@ export const createBid = async (req, res) => {
       buyer: buyerDetails,
       product: productDetails,
     };
+
+    try {
+      const sellerName = `${sellerDetails.firstName} ${sellerDetails.lastName}`.trim();
+      const productTitle = productDetails.title;
+
+      const notif = await productNotificaitonSchema.create({
+        recipientId: buyerId,
+        senderId: sellerId,
+        productId,
+        type: 'new_bid',
+        title: 'New bid received',
+        description: `${sellerName} placed a new quote on your product "${productTitle}".`,
+        roomId: null,
+        metadata: {
+          amount: budgetQuation,
+          bidId: createdBid._id.toString(),
+          productId: productId.toString(),
+        },
+      });
+
+      const io = getIO();
+      const buyerSocketId = onlineUsers.get(buyerId.toString());
+      if (io && buyerSocketId) {
+        io.to(buyerSocketId).emit(SOCKET_EVENTS.NOTIFICATION_NEW, {
+          _id: notif._id.toString(),
+          type: notif.type,
+          title: notif.title,
+          description: notif.description,
+          seen: false,
+          roomId: null,
+          dealId: null,
+          createdAt: notif.createdAt,
+          metadata: notif.metadata,
+        });
+      }
+    } catch (notifErr) {
+      // Don't fail the whole request if notification fails
+      console.error('Bid notification error:', notifErr);
+    }
 
     return ApiResponse.successResponse(res, 200, 'Bid created successfully', {
       bid: populatedBid,

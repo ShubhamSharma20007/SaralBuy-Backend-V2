@@ -27,5 +27,6 @@ const requirementSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+requirementSchema.index({ productId: 1, buyerId: 1 }, { unique: true });
 
 export default mongoose.model('Requirement', requirementSchema);

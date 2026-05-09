@@ -5,8 +5,52 @@ import mongoose from 'mongoose';
 import productSchema from '../models/product.schema.js';
 import { onlineUsers } from './onlineUsers.js';
 import closeDealSchema from '../models/closeDeal.schema.js';
+import productNotificaitonSchema from '../models/productNotificaiton.schema.js';
+
 const chatSocket = (io, socket) => {
   const userId = socket.user._id.toString();
+  const createAndEmitNotification = async ({
+    recipientId,
+    senderId,
+    type,
+    title,
+    description,
+    productId,
+    dealId,
+    roomId,
+    metadata = {},
+  }) => {
+    try {
+      const notif = await productNotificaitonSchema.create({
+        recipientId,
+        senderId,
+        type,
+        title,
+        description,
+        productId: productId || null,
+        dealId: dealId || null,
+        roomId: roomId || null,
+        metadata,
+      });
+
+      const recipientSocketId = onlineUsers.get(recipientId.toString());
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit(SOCKET_EVENTS.NOTIFICATION_NEW, {
+          _id: notif._id.toString(),
+          type: notif.type,
+          title: notif.title,
+          description: notif.description,
+          seen: false,
+          roomId: notif.roomId,
+          dealId: notif.dealId?.toString() || null,
+          createdAt: notif.createdAt,
+          metadata,
+        });
+      }
+    } catch (err) {
+      console.error('createAndEmitNotification error:', err);
+    }
+  };
 
   // User Status
 
@@ -131,7 +175,7 @@ const chatSocket = (io, socket) => {
           status: latestDeal.closedDealStatus, // 'completed' | 'rejected'
           dealStatus: latestDeal.dealStatus, // 'accepted'  | 'rejected'
           amount: latestDeal.amount,
-           sellerRating: latestDeal.sellerRating ?? 0,
+          sellerRating: latestDeal.sellerRating ?? 0,
         });
       }
 
@@ -263,6 +307,20 @@ const chatSocket = (io, socket) => {
         status: 'waiting_seller_approval',
         amount: payload.amount,
       });
+
+      // create new notificaiton
+
+      await createAndEmitNotification({
+        recipientId: payload.sellerId,
+        senderId: payload.buyerId,
+        type: 'deal_request',
+        title: 'New deal request',
+        description: `A buyer sent you a deal request for ₹${payload.amount}.`,
+        productId: payload.productId,
+        dealId: deal._id,
+        roomId: payload.roomId,
+        metadata: { amount: payload.amount },
+      });
     } catch (err) {
       console.error('DEAL_CLOUSER error:', err);
     }
@@ -296,18 +354,43 @@ const chatSocket = (io, socket) => {
         status: newClosedDealStatus,
         dealStatus: newDealStatus,
         amount: updatedDeal.amount,
-        sellerRating: updatedDeal.sellerRating ?? 0,  
+        sellerRating: updatedDeal.sellerRating ?? 0,
       });
 
       // update the product is sold
-      if(newClosedDealStatus === 'completed'){
+      if (newClosedDealStatus === 'completed') {
+        await createAndEmitNotification({
+          recipientId: updatedDeal.buyerId,
+          senderId: updatedDeal.sellerId,
+          type: 'deal_accepted',
+          title: 'Deal accepted!',
+          description: `Your deal request of ₹${updatedDeal.amount} has been accepted.`,
+          productId: updatedDeal.productId,
+          dealId: updatedDeal._id,
+          roomId,
+          metadata: { amount: updatedDeal.amount },
+        });
+
         await productSchema.findByIdAndUpdate(updatedDeal.productId, {
-        $set: {
-          isSoldProduct: true,
-        },
-      });
+          $set: {
+            isSoldProduct: true,
+          },
+        });
       }
-      
+
+      if (newClosedDealStatus === 'rejected') {
+        await createAndEmitNotification({
+          recipientId: updatedDeal.buyerId,
+          senderId: updatedDeal.sellerId,
+          type: 'deal_rejected',
+          title: 'Deal rejected',
+          description: `Your deal request of ₹${updatedDeal.amount} was rejected by the seller.`,
+          productId: updatedDeal.productId,
+          dealId: updatedDeal._id,
+          roomId,
+          metadata: { amount: updatedDeal.amount },
+        });
+      }
     } catch (err) {
       console.error('DEAL_APPROVAL error:', err);
     }
@@ -331,22 +414,77 @@ const chatSocket = (io, socket) => {
   });
 
   // Deal Rating
-socket.on(SOCKET_EVENTS.DEAL_RATING, async ({ dealId, rating }) => {
-  try {
-    if (!dealId || typeof rating !== 'number' || rating < 1 || rating > 5) return;
+  socket.on(SOCKET_EVENTS.DEAL_RATING, async ({ dealId, rating }) => {
+    try {
+      if (!dealId || typeof rating !== 'number' || rating < 1 || rating > 5) return;
 
-    await closeDealSchema.findByIdAndUpdate(
-      dealId,
-      { $set: { sellerRating: rating } },
-      { new: true }
+      const updatedDeal = await closeDealSchema.findByIdAndUpdate(
+        dealId,
+        { $set: { sellerRating: rating } },
+        { new: true }
+      );
+
+      socket.emit(SOCKET_EVENTS.DEAL_RATING, { success: true });
+      if (!updatedDeal) return;
+      await createAndEmitNotification({
+        recipientId: updatedDeal.buyerId,
+        senderId: updatedDeal.sellerId,
+        type: 'chat_rating',
+        title: 'Rating received',
+        description: `The seller rated your deal ${rating} star${rating > 1 ? 's' : ''}.`,
+        productId: updatedDeal.productId,
+        dealId: updatedDeal._id,
+        roomId: updatedDeal.roomId,
+        metadata: { rating },
+      });
+    } catch (err) {
+      console.error('DEAL_RATING error:', err);
+      socket.emit(SOCKET_EVENTS.DEAL_RATING, { success: false });
+    }
+  });
+
+  // Notification
+
+  socket.on(SOCKET_EVENTS.GET_NOTIFICATIONS, async () => {
+    try {
+      const notifs = await productNotificaitonSchema
+        .find({ recipientId: userId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean();
+
+      socket.emit(
+        SOCKET_EVENTS.NOTIFICATIONS,
+        notifs.map(n => ({
+          _id: n._id.toString(),
+          type: n.type,
+          title: n.title,
+          description: n.description,
+          seen: n.seen,
+          roomId: n.roomId,
+          dealId: n.dealId?.toString() || null,
+          createdAt: n.createdAt,
+          metadata: n.metadata || {},
+        }))
+      );
+    } catch (err) {
+      console.error('GET_NOTIFICATIONS error:', err);
+      socket.emit(SOCKET_EVENTS.NOTIFICATIONS, []);
+    }
+  });
+
+  // Mark all as seen
+  socket.on(SOCKET_EVENTS.NOTIFICATION_MARK_ALL_READ, async () => {
+    await productNotificaitonSchema.updateMany(
+      { recipientId: userId, seen: false },
+      { $set: { seen: true } }
     );
+  });
 
-    socket.emit(SOCKET_EVENTS.DEAL_RATING, { success: true });
-  } catch (err) {
-    console.error('DEAL_RATING error:', err);
-    socket.emit(SOCKET_EVENTS.DEAL_RATING, { success: false });
-  }
-});
+  // Mark single as seen
+  socket.on(SOCKET_EVENTS.NOTIFICATION_MARK_READ, async ({ notifId }) => {
+    await productNotificaitonSchema.findByIdAndUpdate(notifId, { $set: { seen: true } });
+  });
 
   socket.on(SOCKET_EVENTS.DISCONNECT, () => {
     onlineUsers.delete(userId);
