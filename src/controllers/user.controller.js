@@ -5,88 +5,88 @@ import uploadFile from '../config/imageKit.config.js';
 
 const otpStore = new Map();
 
-// export const sendOtp = async (req, res) => {
-//   let { pNo } = req.body;
-//   try {
-//     pNo = pNo.startsWith('+') ? pNo : `+91${pNo}`;
+export const sendOtp = async (req, res) => {
+  let { pNo } = req.body;
+  try {
+    pNo = pNo.startsWith('+') ? pNo : `+91${pNo}`;
 
-//     // Generate 6-digit OTP
-//     const otp = Math.floor(1000 + Math.random() * 900000).toString();
-//     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes expiry
+    // Generate 6-digit OTP
+    const otp = Math.floor(1000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes expiry
 
-//     // Save in Map
-//     otpStore.set(pNo, { otp, expiresAt });
+    // Save in Map
+    otpStore.set(pNo, { otp, expiresAt });
 
-//     // For testing (later integrate SMS API)
-//     console.log(`OTP for ${pNo}: ${otp}`);
+    // For testing (later integrate SMS API)
+    console.log(`OTP for ${pNo}: ${otp}`);
 
-//     return ApiResponse.successResponse(res, 200, 'Otp sent successfully', otp);
-//   } catch (err) {
-//     console.error('OTP error:', err);
-//     return ApiResponse.errorResponse(res, 400, err?.message || err);
-//   }
-// };
+    return ApiResponse.successResponse(res, 200, 'Otp sent successfully', otp);
+  } catch (err) {
+    console.error('OTP error:', err);
+    return ApiResponse.errorResponse(res, 400, err?.message || err);
+  }
+};
 
-// export const verifyOtp = async (req, res) => {
-//   let { pNo, otp } = req.body;
+export const verifyOtp = async (req, res) => {
+  let { pNo, otp } = req.body;
 
-//   try {
-//     pNo = pNo.startsWith('+') ? pNo : `+91${pNo}`;
+  try {
+    pNo = pNo.startsWith('+') ? pNo : `+91${pNo}`;
 
-//     const otpData = otpStore.get(pNo);
-//     if (!otpData) {
-//       return ApiResponse.errorResponse(res, 400, 'No OTP found for this number');
-//     }
+    const otpData = otpStore.get(pNo);
+    if (!otpData) {
+      return ApiResponse.errorResponse(res, 400, 'No OTP found for this number');
+    }
 
-//     // Check expiry
-//     if (otpData.expiresAt < Date.now()) {
-//       otpStore.delete(pNo);
-//       return ApiResponse.errorResponse(res, 400, 'OTP expired');
-//     }
+    // Check expiry
+    if (otpData.expiresAt < Date.now()) {
+      otpStore.delete(pNo);
+      return ApiResponse.errorResponse(res, 400, 'OTP expired');
+    }
 
-//     // Check OTP
-//     if (otpData.otp !== otp) {
-//       return ApiResponse.errorResponse(res, 400, 'Invalid OTP');
-//     }
+    // Check OTP
+    if (otpData.otp !== otp) {
+      return ApiResponse.errorResponse(res, 400, 'Invalid OTP');
+    }
 
-//     // ✅ OTP verified
-//     otpStore.delete(pNo); // cleanup after success
+    // ✅ OTP verified
+    otpStore.delete(pNo); // cleanup after success
 
-//     let user = await userSchema.findOne({ phone: pNo });
-//     if (!user) {
-//       user = await userSchema.create({ phone: pNo });
-//     }
+    let user = await userSchema.findOne({ phone: pNo });
+    if (!user) {
+      user = await userSchema.create({ phone: pNo });
+    }
 
-//     const payload = { _id: user._id, phone: user.phone };
-//     const token = user.generateAuthToken();
-//     // res.cookie('authToken', token, {
-//     //   httpOnly: true,
-//     //   secure: process.env.NODE_ENV === 'production',
-//     //   // sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-//     //   sameSite:'None',
-//     //   maxAge: 7 * 24 * 60 * 60 * 1000,
-//     //   path: '/',
-//     // });
-//     res.cookie('authToken', token, {
-//       sameSite: 'none',
-//       httpOnly: true,
-//       secure: true,
-//       path: '/',
-//     });
+    const payload = { _id: user._id, phone: user.phone };
+    const token = user.generateAuthToken();
+    // res.cookie('authToken', token, {
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV === 'production',
+    //   // sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    //   sameSite:'None',
+    //   maxAge: 7 * 24 * 60 * 60 * 1000,
+    //   path: '/',
+    // });
+    res.cookie('authToken', token, {
+      sameSite: 'none',
+      httpOnly: true,
+      secure: true,
+      path: '/',
+    });
 
-//     return ApiResponse.successResponse(res, 200, 'Otp verified successfully', {
-//       token,
-//       user: { _id: user._id, phone: user.phone },
-//     });
-//   } catch (err) {
-//     console.error('Verify error:', err);
-//     return ApiResponse.errorResponse(res, 400, err?.message || err);
-//   }
-// };
+    return ApiResponse.successResponse(res, 200, 'Otp verified successfully', {
+      token,
+      user: { _id: user._id, phone: user.phone },
+    });
+  } catch (err) {
+    console.error('Verify error:', err);
+    return ApiResponse.errorResponse(res, 400, err?.message || err);
+  }
+};
 
 //  2 Factor OTP
 
-export const sendOtp = async (req, res) => {
+export const factorSendOtp = async (req, res) => {
   let { pNo } = req.body;
   try {
     const apiKey = process.env.FACTOR_MESSAGE_API;
@@ -132,7 +132,7 @@ export const sendOtp = async (req, res) => {
   }
 };
 
-export const verifyOtp = async (req, res) => {
+export const factorVerifyOtp = async (req, res) => {
   let { pNo, otp, sessionId } = req.body;
 
   try {

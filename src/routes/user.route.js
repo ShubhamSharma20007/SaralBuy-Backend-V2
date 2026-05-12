@@ -5,10 +5,15 @@ import uploadFile from '../config/imageKit.config.js';
 import { allowUploadFields } from '../utils/multer.js';
 // import upload from '../middleware/multer.js';
 // import uploadSingleImage from '../middleware/uploadMiddleware.js';
-
+const otpController =
+  process.env.NODE_ENV === 'development' ? userController.sendOtp : userController.factorSendOtp;
+const verifyController =
+  process.env.NODE_ENV === 'development'
+    ? userController.verifyOtp
+    : userController.factorVerifyOtp;
 const router = express.Router();
-router.post('/send-otp', userController.sendOtp);
-router.post('/verify-otp', userController.verifyOtp);
+router.post('/send-otp', otpController);
+router.post('/verify-otp', verifyController);
 router.get('/logout', auth, userController.logout);
 
 router.get('/profile', auth, userController.getProfile);
